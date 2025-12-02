@@ -1,0 +1,12 @@
+{
+  "appId": "at.melmuk.tdee",
+  "appName": "TDEE Tracker",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "http",
+    "cleartext": true,
+    "allowNavigation": [
+      "*"
+    ]
+  }
+}
