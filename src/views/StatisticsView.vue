@@ -102,7 +102,6 @@ const weeklyStats = computed(() => {
   sortedLogs.forEach(log => {
     const date = new Date(log.date)
     const weekStart = getWeekStart(date)
-    const weekStart = getWeekStart(date)
     const weekKey = weekStart.toISOString().split('T')[0]
     
     if (!weekGroups[weekKey]) {
