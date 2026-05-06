@@ -49,8 +49,16 @@
           </tbody>
         </q-markup-table>
 
-        <div class="q-mt-sm">
+        <div class="q-mt-sm row q-gutter-sm">
           <q-btn color="primary" label="Add Suggestion" @click="addSuggestion" />
+          <q-btn
+            v-if="store.aiMealRecognitionEnabled"
+            class="ai-magic-btn"
+            unelevated
+            icon="auto_awesome"
+            label="Recognize to Add"
+            @click="router.push('/suggestions/ai-recognition')"
+          />
         </div>
       </q-card-section>
     </q-card>

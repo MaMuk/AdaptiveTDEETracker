@@ -1,0 +1,11 @@
+.ai-magic-btn {
+  color: #ffffff;
+  background: linear-gradient(125deg, #355c7d 0%, #6c5b7b 52%, #c06c84 100%);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.18);
+  box-shadow: -2px -2px 0 rgba(255, 224, 102, 0.24), 0 0 0 1px rgba(255, 106, 213, 0.24), 2px 2px 0 rgba(61, 242, 255, 0.24);
+}
+
+.diary-page,
+.diary-ai-page {
+  padding-top: 8px;
+}

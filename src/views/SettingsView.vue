@@ -55,6 +55,27 @@
       </q-card-section>
     </q-card>
     <q-card class="q-mb-md">
+      <q-card-section>
+        <div class="text-subtitle1">Experimental AI</div>
+        <div class="text-caption q-mb-sm">Experimental feature. Meal image is sent directly to OpenAI using your own API key.</div>
+        <q-toggle
+          v-model="localAiMealRecognitionEnabled"
+          label="Activate experimental AI recognition"
+          color="primary"
+        />
+        <q-input
+          v-if="localAiMealRecognitionEnabled"
+          v-model="localOpenAiApiKey"
+          type="password"
+          label="OpenAI API key"
+          filled
+          class="q-mt-sm"
+          autocomplete="off"
+          hint="Stored locally on this device."
+        />
+      </q-card-section>
+    </q-card>
+    <q-card class="q-mb-md">
       <q-card-actions>
         <q-btn color="positive" label="Save" @click="saveSettings" style="width: 33%;" />
         <q-space />
@@ -103,6 +124,8 @@ const localWeeklyRate = ref(0.5)
 const customRate = ref(0)
 const localFoodDiaryEnabled = ref(false)
 const localDiarySectionsText = ref('Breakfast, Lunch, Dinner, Snacks')
+const localAiMealRecognitionEnabled = ref(false)
+const localOpenAiApiKey = ref('')
 
 const originalValues = ref({})
 
@@ -120,6 +143,8 @@ onMounted(() => {
 
   localFoodDiaryEnabled.value = store.foodDiaryEnabled
   localDiarySectionsText.value = (store.diarySections || []).join(', ')
+  localAiMealRecognitionEnabled.value = store.aiMealRecognitionEnabled
+  localOpenAiApiKey.value = store.openAiApiKey
   
   originalValues.value = {
     startWeight: store.startWeight,
@@ -141,6 +166,8 @@ function saveSettings() {
   }
   store.setFoodDiaryEnabled(localFoodDiaryEnabled.value)
   store.setDiarySections(localDiarySectionsText.value.split(','))
+  store.setAiMealRecognitionEnabled(localAiMealRecognitionEnabled.value)
+  store.setOpenAiApiKey(localOpenAiApiKey.value)
   
   router.push('/')
 }
@@ -177,6 +204,8 @@ function resetData() {
     customRate.value = 0
     localFoodDiaryEnabled.value = false
     localDiarySectionsText.value = 'Breakfast, Lunch, Dinner, Snacks'
+    localAiMealRecognitionEnabled.value = false
+    localOpenAiApiKey.value = ''
     
     $q.notify({
       type: 'positive',

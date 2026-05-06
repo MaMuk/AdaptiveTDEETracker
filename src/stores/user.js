@@ -18,6 +18,8 @@ export const useUserStore = defineStore('user', () => {
     // Suggestions are independent from diary rows and survive diary row deletion.
     // { id, name, amount, calories, usePer100g, caloriesPer100g, updatedAt, usage, sectionUsage }
     const foodSuggestions = ref([])
+    const aiMealRecognitionEnabled = ref(false)
+    const openAiApiKey = ref('')
 
     // TDEE Calculation State
     const calculatedTDEE = ref(null) // Default starting point
@@ -56,11 +58,13 @@ export const useUserStore = defineStore('user', () => {
                 : ['Breakfast', 'Lunch', 'Dinner', 'Snacks']
             foodDiaryEntries.value = Array.isArray(stored.foodDiaryEntries) ? stored.foodDiaryEntries : []
             foodSuggestions.value = Array.isArray(stored.foodSuggestions) ? stored.foodSuggestions : []
+            aiMealRecognitionEnabled.value = Boolean(stored.aiMealRecognitionEnabled)
+            openAiApiKey.value = String(stored.openAiApiKey || '')
         }
     }
 
     // Watch and save to local storage
-    watch([startWeight, goalWeight, height, weeklyRate, logs, calculatedTDEE, foodDiaryEnabled, diarySections, foodDiaryEntries, foodSuggestions], () => {
+    watch([startWeight, goalWeight, height, weeklyRate, logs, calculatedTDEE, foodDiaryEnabled, diarySections, foodDiaryEntries, foodSuggestions, aiMealRecognitionEnabled, openAiApiKey], () => {
         // If startWeight changes and we have no logs and TDEE is default/unset, estimate it
         if (logs.value.length === 0 && startWeight.value) {
             // Only update if it seems we are in setup mode or user changed start weight
@@ -86,7 +90,9 @@ export const useUserStore = defineStore('user', () => {
             foodDiaryEnabled: foodDiaryEnabled.value,
             diarySections: diarySections.value,
             foodDiaryEntries: foodDiaryEntries.value,
-            foodSuggestions: foodSuggestions.value
+            foodSuggestions: foodSuggestions.value,
+            aiMealRecognitionEnabled: aiMealRecognitionEnabled.value,
+            openAiApiKey: openAiApiKey.value
         }))
     }, { deep: true })
 
@@ -128,6 +134,8 @@ export const useUserStore = defineStore('user', () => {
         diarySections.value = ['Breakfast', 'Lunch', 'Dinner', 'Snacks']
         foodDiaryEntries.value = []
         foodSuggestions.value = []
+        aiMealRecognitionEnabled.value = false
+        openAiApiKey.value = ''
         localStorage.removeItem('tdee_user_store')
     }
 
@@ -140,6 +148,14 @@ export const useUserStore = defineStore('user', () => {
             .map(section => String(section || '').trim())
             .filter(section => section.length > 0)
         diarySections.value = sanitized.length > 0 ? [...new Set(sanitized)] : ['Breakfast', 'Lunch', 'Dinner', 'Snacks']
+    }
+
+    function setAiMealRecognitionEnabled(enabled) {
+        aiMealRecognitionEnabled.value = Boolean(enabled)
+    }
+
+    function setOpenAiApiKey(key) {
+        openAiApiKey.value = String(key || '').trim()
     }
 
     function addDiaryEntry(date, entry) {
@@ -314,12 +330,16 @@ export const useUserStore = defineStore('user', () => {
         diarySections,
         foodDiaryEntries,
         foodSuggestions,
+        aiMealRecognitionEnabled,
+        openAiApiKey,
         addLog,
         deleteLog,
         updateTDEE,
         resetAll,
         setFoodDiaryEnabled,
         setDiarySections,
+        setAiMealRecognitionEnabled,
+        setOpenAiApiKey,
         addDiaryEntry,
         updateDiaryEntry,
         deleteDiaryEntry,

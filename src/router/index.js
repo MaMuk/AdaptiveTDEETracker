@@ -4,6 +4,8 @@ import SettingsView from '../views/SettingsView.vue'
 import StatisticsView from '../views/StatisticsView.vue'
 import DiaryView from '../views/DiaryView.vue'
 import SuggestionsView from '../views/SuggestionsView.vue'
+import DiaryAiRecognitionView from '../views/DiaryAiRecognitionView.vue'
+import SuggestionAiRecognitionView from '../views/SuggestionAiRecognitionView.vue'
 
 const routes = [
     {
@@ -30,6 +32,16 @@ const routes = [
         path: '/suggestions',
         name: 'Suggestions',
         component: SuggestionsView
+    },
+    {
+        path: '/diary/ai-recognition',
+        name: 'DiaryAiRecognition',
+        component: DiaryAiRecognitionView
+    },
+    {
+        path: '/suggestions/ai-recognition',
+        name: 'SuggestionAiRecognition',
+        component: SuggestionAiRecognitionView
     }
 ]
 

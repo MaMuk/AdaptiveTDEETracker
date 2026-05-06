@@ -11,7 +11,7 @@ The Adaptive TDEE Tracker is a Vue 3-based mobile application that implements an
 - **Adaptive TDEE Calculation**: Automatically calculates your TDEE based on your actual data
 - **Goal-Oriented Recommendations**: Get personalized calorie targets to reach your goal weight
 - **Weight Trend Analysis**: View statistics and trends over time
-- **Optional Food Diary**: Keep per-day meal rows by section (offline, local-only)
+- **Optional Food Diary**: Keep per-day meal rows by section
 - **Suggestions Library**: Reuse common foods with section-aware ranking and search
 - **Offline-First**: All data is stored locally on your device
 
@@ -67,6 +67,42 @@ The Adaptive TDEE Tracker is a Vue 3-based mobile application that implements an
      - recency of use,
      - recency of update
 
+6. **Experimental AI Recognition (Enable in Settings)**:
+   - Enable **Activate experimental AI meal recognition** in Settings
+   - Add your own OpenAI API key in Settings (stored locally on device)
+   - AI buttons are shown only when the experimental toggle is enabled
+   - Images are compressed/resized client-side before request and are not persisted
+   - The user always reviews/edits before saving; AI never auto-saves entries
+
+### Experimental AI Flows
+
+- **Diary AI (Recognize Meal)**:
+  - Opens from Diary via the `Recognize Meal` button
+  - Returns up to 4 guesses with:
+    - meal name
+    - calorie range (`low`, `estimate`, `high`)
+    - confidence (`low`, `medium`, `high`)
+  - You select a guess, edit name/calories, then confirm save to diary
+
+- **Suggestions AI (AI Add)**:
+  - Opens from Suggestions via the `AI Add` button
+  - Designed for reusable products/foods, including generic packaged items
+  - Includes **Nutrition label mode** for label-focused recognition
+  - You can manually edit:
+    - name
+    - amount
+    - calories
+    - calories-per-100g mode
+  - Final save adds to Suggestions, not directly to Diary
+
+- **Demo Mode**:
+  - If experimental AI is enabled but no API key is set, the app returns a clearly-marked mock demo response for testing the UI flow.
+
+- **Privacy and Scope**:
+  - No image is stored in persistent app state or diary entries
+  - Feature is experimental and intended as a speed/orientation aid
+  - Calorie-only focus (no macro tracking)
+
 ### Tips for Best Results
 
 - **Consistency is Key**: Log your data daily for the most accurate TDEE calculations
@@ -93,7 +129,6 @@ The Adaptive TDEE Tracker is a Vue 3-based mobile application that implements an
 ```bash
 npm install
 ```
-If you're working in a restricted/offline environment, run `npm install` locally outside the sandboxed agent session.
 
 #### Run Development Server
 ```bash

@@ -11,6 +11,14 @@
       </q-card-section>
       <q-card-actions class="q-pt-none" align="between">
         <q-btn flat icon="arrow_back" label="Back" @click="router.push('/')" />
+        <q-btn
+          v-if="store.aiMealRecognitionEnabled"
+          class="ai-magic-btn"
+          unelevated
+          icon="auto_awesome"
+          label="Recognize Meal"
+          @click="openRecognition"
+        />
       </q-card-actions>
     </q-card>
 
@@ -287,13 +295,13 @@ function onDateSelected() {
 function formatDate(dateString) {
   return qDate.formatDate(dateString, 'MMM D, YYYY')
 }
+
+function openRecognition() {
+  router.push({ path: '/diary/ai-recognition', query: { date: selectedDate.value } })
+}
 </script>
 
 <style scoped>
-.diary-page {
-  padding-top: 8px;
-}
-
 .section-block {
   padding: 2px 0;
 }
