@@ -26,16 +26,19 @@ export class OpenAiMealRecognitionProvider extends AiMealRecognitionProvider {
           {
             name: 'Double cheeseburger with two beef patties and cheese',
             calories: { low: 450, estimate: 520, high: 600 },
+            caloriesPer100g: 265,
             confidence: 'high'
           },
           {
             name: 'Cheeseburger with a beef patty and cheese slice',
             calories: { low: 300, estimate: 380, high: 450 },
+            caloriesPer100g: 250,
             confidence: 'medium'
           },
           {
             name: 'Cheeseburger with added grilled onions',
             calories: { low: 320, estimate: 400, high: 480 },
+            caloriesPer100g: 240,
             confidence: 'medium'
           }
         ]
@@ -85,7 +88,7 @@ export class OpenAiMealRecognitionProvider extends AiMealRecognitionProvider {
 
     let parsed
     try {
-      parsed = JSON.parse(outputText)
+      parsed = parseStructuredJson(outputText)
     } catch {
       throw new Error('AI provider response was not valid JSON.')
     }
@@ -106,7 +109,7 @@ function buildPrompt(options = {}) {
   const base = [
     'Estimate calories from this food photo for a calorie-only TDEE app.',
     'Return strict JSON only with this exact shape:',
-    '{"guesses":[{"name":"string","calories":{"low":number,"estimate":number,"high":number},"confidence":"low|medium|high"}]}.',
+    '{"guesses":[{"name":"string","calories":{"low":number,"estimate":number,"high":number},"caloriesPer100g":number|null,"confidence":"low|medium|high"}]}.',
     'Provide up to 4 plausible guesses.',
     'Avoid fake precision. Keep ranges realistic.',
     'No macros. No explanation text.'
@@ -119,6 +122,7 @@ function buildPrompt(options = {}) {
   if (context === 'suggestions') {
     base.push('This is for a reusable food suggestion table, not an immediate diary meal.')
     base.push('Recognize generic products and packaged foods when visible.')
+    base.push('Always include caloriesPer100g for each guess.')
   }
 
   if (isNutritionLabel) {
@@ -145,4 +149,31 @@ function extractOutputText(payload) {
   }
 
   return ''
+}
+
+function parseStructuredJson(text) {
+  const normalized = stripCodeFences(String(text || '').trim())
+  try {
+    return JSON.parse(normalized)
+  } catch {
+    const fromBraces = extractFirstJsonObject(normalized)
+    return JSON.parse(fromBraces)
+  }
+}
+
+function stripCodeFences(text) {
+  if (!text.startsWith('```')) return text
+  return text
+    .replace(/^```[a-zA-Z0-9_-]*\s*/, '')
+    .replace(/\s*```$/, '')
+    .trim()
+}
+
+function extractFirstJsonObject(text) {
+  const start = text.indexOf('{')
+  const end = text.lastIndexOf('}')
+  if (start === -1 || end === -1 || end < start) {
+    throw new Error('No JSON object found')
+  }
+  return text.slice(start, end + 1)
 }

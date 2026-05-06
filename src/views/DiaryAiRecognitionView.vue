@@ -21,19 +21,43 @@
           {{ demoMessage }}
         </q-banner>
 
-        <q-file
-          v-model="selectedFile"
+        <div class="row q-gutter-sm">
+          <q-btn
+            outline
+            icon="photo_camera"
+            label="Take Photo"
+            :disable="isRecognizing"
+            @click="openCameraPicker"
+          />
+          <q-btn
+            outline
+            icon="collections"
+            label="Choose from Gallery"
+            :disable="isRecognizing"
+            @click="openGalleryPicker"
+          />
+          <q-btn
+            flat
+            label="Clear Photo"
+            :disable="!selectedImageDataUrl || isRecognizing"
+            @click="clearTransientImageData"
+          />
+        </div>
+        <input
+          ref="cameraInputRef"
+          type="file"
           accept="image/*"
-          filled
-          clearable
-          label="Take or select meal photo"
           capture="environment"
-          @update:model-value="onImageSelected"
-        >
-          <template #prepend>
-            <q-icon name="photo_camera" />
-          </template>
-        </q-file>
+          style="display: none"
+          @change="onFileInputChange"
+        />
+        <input
+          ref="galleryInputRef"
+          type="file"
+          accept="image/*"
+          style="display: none"
+          @change="onFileInputChange"
+        />
 
         <div v-if="selectedImageDataUrl" class="q-mt-md">
           <q-img :src="selectedImageDataUrl" fit="contain" style="max-height: 300px; border-radius: 8px;" />
@@ -119,6 +143,8 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useQuasar } from 'quasar'
+import { Capacitor } from '@capacitor/core'
+import { Camera, CameraResultType, CameraSource } from '@capacitor/camera'
 import { useUserStore } from '../stores/user'
 import { createAiMealRecognitionService } from '../services/aiMealRecognition'
 import { preprocessImageDataUrl } from '../services/aiMealRecognition/imagePreprocessing'
@@ -130,6 +156,8 @@ const $q = useQuasar()
 
 const selectedDate = ref(String(route.query.date || new Date().toISOString().split('T')[0]))
 const selectedFile = ref(null)
+const cameraInputRef = ref(null)
+const galleryInputRef = ref(null)
 const selectedImageDataUrl = ref('')
 const guesses = ref([])
 const selectedGuessIndex = ref(0)
@@ -137,6 +165,7 @@ const draftName = ref('')
 const draftCalories = ref(0)
 const draftSection = ref('')
 const isRecognizing = ref(false)
+const isOpeningCamera = ref(false)
 const errorMessage = ref('')
 const warningMessage = ref('')
 const demoMessage = ref('')
@@ -210,6 +239,89 @@ function onImageSelected(file) {
     errorMessage.value = 'Could not read selected image.'
   }
   reader.readAsDataURL(file)
+}
+
+async function openCameraPicker() {
+  if (isOpeningCamera.value || isRecognizing.value) return
+  isOpeningCamera.value = true
+  warningMessage.value = ''
+  try {
+    if (Capacitor.isPluginAvailable('Camera')) {
+      const captured = await tryCaptureWithCapacitorCamera()
+      if (!captured) {
+        warningMessage.value = 'No photo captured.'
+      }
+      return
+    }
+    warningMessage.value = 'Direct camera capture plugin is unavailable. Falling back to browser file picker.'
+    cameraInputRef.value?.click()
+  } catch {
+    warningMessage.value = 'Camera action failed.'
+  } finally {
+    isOpeningCamera.value = false
+  }
+}
+
+function openGalleryPicker() {
+  galleryInputRef.value?.click()
+}
+
+function onFileInputChange(event) {
+  const file = event?.target?.files?.[0] || null
+  onImageSelected(file)
+  if (event?.target) {
+    event.target.value = ''
+  }
+}
+
+async function tryCaptureWithCapacitorCamera() {
+  try {
+    const photo = await Camera.getPhoto({
+      quality: 80,
+      resultType: CameraResultType.DataUrl,
+      source: CameraSource.Camera
+    })
+    const resolvedDataUrl = await resolvePhotoToDataUrl(photo)
+    if (resolvedDataUrl) {
+      onImageSelected(dataUrlToFile(resolvedDataUrl, 'camera-photo.jpg'))
+      return true
+    }
+    return false
+  } catch {
+    return false
+  }
+}
+
+async function resolvePhotoToDataUrl(photo) {
+  if (photo?.dataUrl) return photo.dataUrl
+  if (photo?.base64String) return `data:image/jpeg;base64,${photo.base64String}`
+  if (photo?.webPath) {
+    const response = await fetch(photo.webPath)
+    const blob = await response.blob()
+    return await blobToDataUrl(blob)
+  }
+  return ''
+}
+
+function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result || ''))
+    reader.onerror = () => reject(new Error('Could not read camera image blob.'))
+    reader.readAsDataURL(blob)
+  })
+}
+
+function dataUrlToFile(dataUrl, filename) {
+  const [meta, base64] = String(dataUrl).split(',')
+  const mimeMatch = /data:([^;]+);base64/.exec(meta || '')
+  const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg'
+  const binary = atob(base64 || '')
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i)
+  }
+  return new File([bytes], filename, { type: mimeType })
 }
 
 async function recognizeMeal() {
@@ -314,5 +426,3 @@ function goBack() {
   router.push({ path: '/diary', query: { date: selectedDate.value } })
 }
 </script>
-
-
