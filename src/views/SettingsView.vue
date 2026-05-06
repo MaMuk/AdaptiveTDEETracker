@@ -35,6 +35,26 @@
       </q-card-section>
     </q-card>
     <q-card class="q-mb-md">
+      <q-card-section>
+        <div class="text-subtitle1">Food Diary</div>
+        <div class="text-caption q-mb-sm">Optional offline diary that can fill calories into the daily log when you choose.</div>
+        <q-toggle
+          v-model="localFoodDiaryEnabled"
+          label="Enable Food Diary"
+          color="primary"
+        />
+        <q-input
+          v-if="localFoodDiaryEnabled"
+          v-model="localDiarySectionsText"
+          type="text"
+          label="Sections (comma separated)"
+          filled
+          class="q-mt-sm"
+          hint="Example: Breakfast, Lunch, Dinner, Snacks"
+        />
+      </q-card-section>
+    </q-card>
+    <q-card class="q-mb-md">
       <q-card-actions>
         <q-btn color="positive" label="Save" @click="saveSettings" style="width: 33%;" />
         <q-space />
@@ -81,6 +101,8 @@ const localGoalWeight = ref(null)
 const localHeight = ref(null)
 const localWeeklyRate = ref(0.5)
 const customRate = ref(0)
+const localFoodDiaryEnabled = ref(false)
+const localDiarySectionsText = ref('Breakfast, Lunch, Dinner, Snacks')
 
 const originalValues = ref({})
 
@@ -95,6 +117,9 @@ onMounted(() => {
   } else {
     localWeeklyRate.value = store.weeklyRate
   }
+
+  localFoodDiaryEnabled.value = store.foodDiaryEnabled
+  localDiarySectionsText.value = (store.diarySections || []).join(', ')
   
   originalValues.value = {
     startWeight: store.startWeight,
@@ -114,13 +139,8 @@ function saveSettings() {
   } else {
     store.weeklyRate = localWeeklyRate.value
   }
-  
-  router.push('/')
-  if (localWeeklyRate.value === 'custom') {
-    store.weeklyRate = customRate.value
-  } else {
-    store.weeklyRate = localWeeklyRate.value
-  }
+  store.setFoodDiaryEnabled(localFoodDiaryEnabled.value)
+  store.setDiarySections(localDiarySectionsText.value.split(','))
   
   router.push('/')
 }
@@ -155,6 +175,8 @@ function resetData() {
     localHeight.value = null
     localWeeklyRate.value = 0.5
     customRate.value = 0
+    localFoodDiaryEnabled.value = false
+    localDiarySectionsText.value = 'Breakfast, Lunch, Dinner, Snacks'
     
     $q.notify({
       type: 'positive',

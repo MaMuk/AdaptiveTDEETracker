@@ -10,6 +10,8 @@
         <q-btn dense text-color="accent" icon="home" to="/" />
         <q-space />
         <q-btn dense text-color="accent" icon="insert_chart" to="/statistics" />
+        <q-space v-if="store.foodDiaryEnabled" />
+        <q-btn v-if="store.foodDiaryEnabled" dense text-color="accent" icon="restaurant" to="/suggestions" />
         <q-space />
         <q-btn dense text-color="accent" icon="settings" to="/settings" />
       </q-toolbar>
@@ -17,3 +19,8 @@
   </q-layout>
 </template>
 
+<script setup>
+import { useUserStore } from './stores/user'
+
+const store = useUserStore()
+</script>

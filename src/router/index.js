@@ -2,6 +2,8 @@ import { createRouter, createWebHistory } from 'vue-router'
 import TrackerView from '../views/TrackerView.vue'
 import SettingsView from '../views/SettingsView.vue'
 import StatisticsView from '../views/StatisticsView.vue'
+import DiaryView from '../views/DiaryView.vue'
+import SuggestionsView from '../views/SuggestionsView.vue'
 
 const routes = [
     {
@@ -18,6 +20,16 @@ const routes = [
         path: '/statistics',
         name: 'Statistics',
         component: StatisticsView
+    },
+    {
+        path: '/diary',
+        name: 'Diary',
+        component: DiaryView
+    },
+    {
+        path: '/suggestions',
+        name: 'Suggestions',
+        component: SuggestionsView
     }
 ]
 

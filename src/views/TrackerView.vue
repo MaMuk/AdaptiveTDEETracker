@@ -1,12 +1,8 @@
 <template>
   <q-page padding>
-    <!-- TDEE Card -->
     <q-card class="bg-accent text-primary q-mb-md">
       <q-card-section class="q-pb-sm">
-        
-        <!-- Information Grid -->
         <div class="row q-col-gutter-sm">
-          <!-- Current Weight & Change -->
           <div class="col-6">
             <q-card flat bordered class="bg-white">
               <q-card-section class="q-pa-sm">
@@ -21,7 +17,6 @@
             </q-card>
           </div>
 
-          <!-- Goal Weight -->
           <div class="col-6">
             <q-card flat bordered class="bg-white">
               <q-card-section class="q-pa-sm">
@@ -36,7 +31,6 @@
             </q-card>
           </div>
 
-          <!-- Recommended Calories -->
           <div class="col-12">
             <q-card flat bordered class="bg-white">
               <q-card-section class="q-pa-sm">
@@ -55,7 +49,6 @@
             </q-card>
           </div>
 
-          <!-- 7-Day Delta -->
           <div class="col-12">
             <q-card flat bordered class="bg-white">
               <q-card-section class="q-pa-sm">
@@ -81,31 +74,17 @@
       </q-card-section>
     </q-card>
 
-    <!-- Date Carousel -->
     <div class="date-carousel-container q-mb-md">
       <div class="date-navigation row items-center justify-between q-mb-sm">
-        <q-btn 
-          flat 
-          round 
-          dense 
-          icon="chevron_left" 
-          @click="previousDay"
-          aria-label="Previous day"
-        />
+        <q-btn flat round dense icon="chevron_left" @click="previousDay" aria-label="Previous day" />
         <div class="text-h6 cursor-pointer" @click="showDatePicker = true">
-          <time :datetime="selectedDate" :title="formatDate(selectedDate)"><q-btn color="white" text-color="primary" outline  label="Select Date" icon="calendar_month" @click="showDatePicker = true" /></time>
+          <time :datetime="selectedDate" :title="formatDate(selectedDate)">
+            <q-btn color="white" text-color="primary" outline label="Select Date" icon="calendar_month" @click="showDatePicker = true" />
+          </time>
         </div>
-        <q-btn 
-          flat 
-          round 
-          dense 
-          icon="chevron_right" 
-          @click="nextDay"
-          aria-label="Next day"
-        />
+        <q-btn flat round dense icon="chevron_right" @click="nextDay" aria-label="Next day" />
       </div>
 
-      <!-- Carousel -->
       <div class="carousel-container">
         <transition :name="transitionName" mode="out-in">
           <q-card :key="selectedDate" class="day-card elevation-4">
@@ -114,58 +93,77 @@
               <div class="text-subtitle1 text-center q-mb-sm">{{ formatDate(selectedDate) }}</div>
               <div class="row q-col-gutter-sm">
                 <div class="col-6">
-                  <q-input 
-                    v-model.number="currentWeight" 
-                    type="number" 
-                    label="Weight (kg)" 
-                    filled 
-                    dense 
-                    step="0.1"
-                  />
+                  <q-input v-model.number="currentWeight" type="number" label="Weight (kg)" filled dense step="0.1" />
                 </div>
                 <div class="col-6">
-                  <q-input 
-                    v-model.number="currentCalories" 
-                    type="number" 
-                    label="Calories" 
-                    filled 
-                    dense 
-                    step="1"
-                  />
+                  <q-input v-model.number="currentCalories" type="number" label="Calories" filled dense step="1" />
                 </div>
               </div>
-              <q-btn 
-                label="Save Entry" 
-                color="primary" 
-                class="full-width q-mt-sm" 
-                @click="saveLog" 
-              />
+              <q-btn label="Save Entry" color="primary" class="full-width q-mt-sm" @click="saveLog" />
             </q-card-section>
           </q-card>
         </transition>
       </div>
     </div>
 
-    <!-- Date Picker Dialog -->
+    <div v-if="store.foodDiaryEnabled" class="q-mb-md">
+      <transition :name="transitionName" mode="out-in">
+        <q-card :key="`summary-${selectedDate}`">
+          <q-card-section>
+            <div class="row items-center justify-between q-mb-sm">
+              <div class="text-h6">Diary Summary</div>
+              <div class="row items-center q-gutter-xs">
+                <q-btn
+                  dense
+                  flat
+                  :icon="isDiarySummaryCollapsed ? 'expand_more' : 'expand_less'"
+                  :label="isDiarySummaryCollapsed ? 'Expand' : 'Collapse'"
+                  @click="isDiarySummaryCollapsed = !isDiarySummaryCollapsed"
+                />
+                <q-btn dense flat icon="open_in_new" label="Open Diary" @click="openDiaryForSection('')" />
+              </div>
+            </div>
+            <div class="text-caption q-mb-sm">Date: {{ formatDate(selectedDate) }}</div>
+
+            <div v-if="!isDiarySummaryCollapsed">
+              <div v-if="dayDiaryEntries.length === 0" class="text-grey-7 q-mb-sm">No diary entries for this day yet.</div>
+
+              <div v-for="group in diarySummaryGroups" :key="group.key" class="q-mb-sm">
+                <div class="text-subtitle2 q-mb-xs">{{ group.label }}</div>
+                <q-list bordered separator>
+                  <q-item v-for="entry in group.entries" :key="entry.id">
+                    <q-item-section>
+                      <q-item-label>{{ entry.name }}</q-item-label>
+                      <q-item-label caption>
+                        {{ entry.amount || 'No amount' }} • {{ entry.calories }} kcal
+                      </q-item-label>
+                    </q-item-section>
+                  </q-item>
+                </q-list>
+              </div>
+            </div>
+
+            <div class="row items-center justify-between q-mt-md">
+              <div class="text-subtitle1">Diary Total: {{ dayDiaryCalories }} kcal</div>
+              <q-btn color="primary" label="Mark Day Complete" @click="commitDiaryToDailyLog" :disable="dayDiaryEntries.length === 0" />
+            </div>
+          </q-card-section>
+        </q-card>
+      </transition>
+    </div>
+
     <QDialog v-model="showDatePicker">
       <q-card-section>
-        <QDate 
-          v-model="selectedDate" 
-          mask="YYYY-MM-DD"
-          @update:model-value="onDateSelected"
-        />
+        <QDate v-model="selectedDate" mask="YYYY-MM-DD" @update:model-value="onDateSelected" />
       </q-card-section>
     </QDialog>
 
-    <!-- Delete Confirmation Dialog -->
     <QDialog v-model="showDeleteDialog">
       <q-card>
         <q-card-section>
           <div class="text-h6">Delete Entry</div>
         </q-card-section>
-        <q-card-section>
-          Are you sure you want to delete this entry?
-        </q-card-section>
+        <q-card-section>Are you sure you want to delete this entry?</q-card-section>
         <q-card-actions align="right">
           <q-btn flat label="Cancel" color="primary" v-close-popup />
           <q-btn flat label="Delete" color="negative" @click="deleteEntry" />
@@ -173,7 +171,6 @@
       </q-card>
     </QDialog>
 
-    <!-- Recent History -->
     <div class="text-h6 q-mb-sm">History</div>
     <q-list bordered separator class="bg-white rounded-borders">
       <q-item v-for="log in displayedLogs" :key="log.date">
@@ -187,15 +184,7 @@
           </div>
         </q-item-section>
         <q-item-section side>
-          <q-btn 
-            flat 
-            round 
-            dense 
-            icon="delete" 
-            color="negative"
-            @click.stop="confirmDelete(log.date)"
-            aria-label="Delete entry"
-          />
+          <q-btn flat round dense icon="delete" color="negative" @click.stop="confirmDelete(log.date)" aria-label="Delete entry" />
         </q-item-section>
       </q-item>
       <q-item v-if="canLoadMore" clickable @click="loadMore">
@@ -204,17 +193,19 @@
         </q-item-section>
       </q-item>
     </q-list>
-
   </q-page>
 </template>
 
 <script setup>
 import { ref, computed, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { useUserStore } from '../stores/user'
-import { date as qDate } from 'quasar'
+import { date as qDate, useQuasar } from 'quasar'
 import { QDate, QDialog } from 'quasar'
 
 const store = useUserStore()
+const router = useRouter()
+const $q = useQuasar()
 
 const selectedDate = ref(new Date().toISOString().split('T')[0])
 const showDatePicker = ref(false)
@@ -226,8 +217,8 @@ const showCalorieBreakdown = ref(false)
 
 const currentWeight = ref(null)
 const currentCalories = ref(null)
-
 const historyLimit = ref(14)
+const isDiarySummaryCollapsed = ref(false)
 
 const previousDayDate = computed(() => {
   const d = new Date(selectedDate.value)
@@ -253,22 +244,28 @@ function loadDateData() {
 }
 
 loadDateData()
+watch(selectedDate, () => loadDateData())
 
-watch(selectedDate, () => {
-  loadDateData()
+const allLogs = computed(() => [...store.logs].sort((a, b) => new Date(b.date) - new Date(a.date)))
+const displayedLogs = computed(() => allLogs.value.slice(0, historyLimit.value))
+const canLoadMore = computed(() => allLogs.value.length > historyLimit.value)
+
+const dayDiaryEntries = computed(() => store.getDiaryEntriesByDate(selectedDate.value))
+
+const diarySummaryGroups = computed(() => {
+  const groups = []
+  const unsectioned = dayDiaryEntries.value.filter(entry => !entry.section)
+  if (unsectioned.length > 0) groups.push({ key: 'unsectioned', label: 'Unsectioned', entries: unsectioned })
+
+  for (const section of store.diarySections) {
+    const entries = dayDiaryEntries.value.filter(entry => entry.section === section)
+    if (entries.length > 0) groups.push({ key: section, label: section, entries })
+  }
+
+  return groups
 })
 
-const allLogs = computed(() => {
-  return [...store.logs].sort((a, b) => new Date(b.date) - new Date(a.date))
-})
-
-const displayedLogs = computed(() => {
-  return allLogs.value.slice(0, historyLimit.value)
-})
-
-const canLoadMore = computed(() => {
-  return allLogs.value.length > historyLimit.value
-})
+const dayDiaryCalories = computed(() => store.sumDiaryCaloriesByDate(selectedDate.value))
 
 function roundTo25(val) {
   if (val === '—' || val === null || val === undefined || isNaN(val)) return '—'
@@ -285,24 +282,16 @@ const weightChangeText = computed(() => {
 const weightChangeClass = computed(() => {
   if (!store.startWeight || !store.averageWeight) return 'text-grey-7'
   const change = store.averageWeight - store.startWeight
-  
   if (store.weeklyRate === undefined) return 'text-grey-7'
-  
-  if (store.weeklyRate < 0) {
-    return change <= 0 ? 'text-positive' : 'text-negative'
-  } else if (store.weeklyRate > 0) {
-    return change >= 0 ? 'text-positive' : 'text-negative'
-  } else {
-    return 'text-grey-7'
-  }
+  if (store.weeklyRate < 0) return change <= 0 ? 'text-positive' : 'text-negative'
+  if (store.weeklyRate > 0) return change >= 0 ? 'text-positive' : 'text-negative'
+  return 'text-grey-7'
 })
 
 const goalDifference = computed(() => {
   if (!store.averageWeight || !store.goalWeight) return '—'
   const diff = Math.abs(store.goalWeight - store.averageWeight)
-  
   if (store.weeklyRate === 0) return 'Maintain'
-  
   const direction = store.goalWeight < store.currentWeight ? 'to lose' : 'to gain'
   return `${diff.toFixed(1)} kg ${direction}`
 })
@@ -312,7 +301,6 @@ const weeksToGoal = computed(() => {
   const diff = Math.abs(store.goalWeight - store.averageWeight)
   const rate = Math.abs(store.weeklyRate)
   if (rate === 0) return 'Maintain Goal'
-  
   const weeks = diff / rate
   if (weeks < 1) return 'Less than 1 week'
   return `${weeks.toFixed(1)} weeks to reach your goal`
@@ -322,9 +310,7 @@ const goalDateText = computed(() => {
   if (!store.averageWeight || !store.goalWeight || store.weeklyRate === undefined) return '—'
   const diff = Math.abs(store.goalWeight - store.averageWeight)
   const rate = Math.abs(store.weeklyRate)
-  
   if (rate === 0) return '—'
-  
   const weeks = diff / rate
   const days = Math.round(weeks * 7)
   const goalDate = new Date()
@@ -334,26 +320,18 @@ const goalDateText = computed(() => {
 
 const recommendedCalories = computed(() => {
   if (!store.calculatedTDEE || store.weeklyRate === undefined) return '—'
-  
   const dailyAdjustment = (store.weeklyRate * 7700) / 7
-  const targetCalories = store.calculatedTDEE + dailyAdjustment
-  
-  return Math.round(targetCalories)
+  return Math.round(store.calculatedTDEE + dailyAdjustment)
 })
 
 const sevenDayWeightDelta = computed(() => {
   if (store.logs.length < 2) return '—'
-  
   const sortedLogs = [...store.logs].sort((a, b) => new Date(b.date) - new Date(a.date))
   const recentLogs = sortedLogs.slice(0, 7)
-  
   if (recentLogs.length < 2) return '—'
-  
   const latestWeight = recentLogs[0].weight
   const oldestWeight = recentLogs[recentLogs.length - 1].weight
-  
   if (!latestWeight || !oldestWeight) return '—'
-  
   const change = latestWeight - oldestWeight
   const prefix = change >= 0 ? '+' : ''
   return `${prefix}${change.toFixed(2)} kg`
@@ -361,38 +339,24 @@ const sevenDayWeightDelta = computed(() => {
 
 const sevenDayWeightClass = computed(() => {
   if (store.logs.length < 2) return 'text-grey-7'
-  
   const sortedLogs = [...store.logs].sort((a, b) => new Date(b.date) - new Date(a.date))
   const recentLogs = sortedLogs.slice(0, 7)
-  
   if (recentLogs.length < 2) return 'text-grey-7'
-  
   const latestWeight = recentLogs[0].weight
   const oldestWeight = recentLogs[recentLogs.length - 1].weight
-  
   if (!latestWeight || !oldestWeight || store.weeklyRate === undefined) return 'text-grey-7'
-  
   const change = latestWeight - oldestWeight
-  
-  if (store.weeklyRate < 0) {
-    return change <= 0 ? 'text-positive' : 'text-negative'
-  } else if (store.weeklyRate > 0) {
-    return change >= 0 ? 'text-positive' : 'text-negative'
-  } else {
-    return 'text-grey-7'
-  }
+  if (store.weeklyRate < 0) return change <= 0 ? 'text-positive' : 'text-negative'
+  if (store.weeklyRate > 0) return change >= 0 ? 'text-positive' : 'text-negative'
+  return 'text-grey-7'
 })
 
 const sevenDayAvgCalories = computed(() => {
   if (store.logs.length === 0) return 0
-  
   const sortedLogs = [...store.logs].sort((a, b) => new Date(b.date) - new Date(a.date))
   const recentLogs = sortedLogs.slice(0, 7).filter(log => log.calories)
-  
   if (recentLogs.length === 0) return 0
-  
-  const sum = recentLogs.reduce((acc, log) => acc + log.calories, 0)
-  return sum / recentLogs.length
+  return recentLogs.reduce((acc, log) => acc + log.calories, 0) / recentLogs.length
 })
 
 const sevenDayAvgCaloriesRounded = computed(() => {
@@ -403,15 +367,11 @@ const sevenDayAvgCaloriesRounded = computed(() => {
 
 const calorieBreakdownText = computed(() => {
   if (!store.startWeight && !store.currentWeight) return '—'
-  
   const tdee = roundTo25(store.calculatedTDEE)
   const difference = roundTo25(recommendedCalories.value - store.calculatedTDEE)
   const sign = difference >= 0 ? '+' : '-'
-  const absoluteDifference = Math.abs(difference)
-  
-  return ` (${tdee} kcal ${sign} ${absoluteDifference} kcal)`
+  return ` (${tdee} kcal ${sign} ${Math.abs(difference)} kcal)`
 })
-
 
 function loadMore() {
   historyLimit.value += 7
@@ -454,12 +414,39 @@ function saveLog() {
   store.addLog(selectedDate.value, currentWeight.value, currentCalories.value)
 }
 
-function formatDate(dateString) {
-  return qDate.formatDate(dateString, 'MMM D, YYYY')
+function openDiaryForSection(section) {
+  router.push({ path: '/diary', query: { date: selectedDate.value, section: section || '' } })
 }
 
-function formatDateShort(dateString) {
-  return qDate.formatDate(dateString, 'MMM D')
+function commitDiaryToDailyLog() {
+  if (dayDiaryEntries.value.length === 0) return
+  const totalCalories = dayDiaryCalories.value
+  const existingLog = store.logs.find(log => log.date === selectedDate.value)
+  const hasExistingCalories = existingLog && existingLog.calories !== null && existingLog.calories !== undefined
+
+  const commit = () => {
+    const weightToUse = existingLog ? existingLog.weight : currentWeight.value
+    store.addLog(selectedDate.value, weightToUse, totalCalories)
+    currentCalories.value = totalCalories
+    $q.notify({ type: 'positive', message: `Saved ${totalCalories} kcal to daily log.` })
+  }
+
+  if (hasExistingCalories && existingLog.calories !== totalCalories) {
+    $q.dialog({
+      title: 'Overwrite Daily Calories?',
+      message: `This day already has ${existingLog.calories} kcal in the daily log. Replace it with ${totalCalories} kcal from the diary?`,
+      cancel: true,
+      persistent: true,
+      ok: { label: 'Overwrite', color: 'negative' }
+    }).onOk(commit)
+    return
+  }
+
+  commit()
+}
+
+function formatDate(dateString) {
+  return qDate.formatDate(dateString, 'MMM D, YYYY')
 }
 
 function confirmDelete(date) {
@@ -493,7 +480,6 @@ function deleteEntry() {
   margin: 0 auto;
 }
 
-/* Slide animations */
 .slide-left-enter-active,
 .slide-left-leave-active,
 .slide-right-enter-active,

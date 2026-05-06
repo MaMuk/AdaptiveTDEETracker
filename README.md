@@ -11,6 +11,8 @@ The Adaptive TDEE Tracker is a Vue 3-based mobile application that implements an
 - **Adaptive TDEE Calculation**: Automatically calculates your TDEE based on your actual data
 - **Goal-Oriented Recommendations**: Get personalized calorie targets to reach your goal weight
 - **Weight Trend Analysis**: View statistics and trends over time
+- **Optional Food Diary**: Keep per-day meal rows by section (offline, local-only)
+- **Suggestions Library**: Reuse common foods with section-aware ranking and search
 - **Offline-First**: All data is stored locally on your device
 
 **Current Status:**
@@ -36,11 +38,34 @@ The Adaptive TDEE Tracker is a Vue 3-based mobile application that implements an
    - Log your daily weight (weigh yourself at the same time each day for consistency)
    - Record your total calorie intake for the day
    - View your recommended daily calorie target
+   - Optionally review/collapse the per-day diary summary and commit diary calories via **Mark Day Complete**
 
 3. **Monitor Progress**: Check the Statistics view to:
    - See your weight trends over time
    - Review weekly averages and changes
    - Track your progress toward your goal
+
+4. **Optional Food Diary (Enable in Settings)**:
+   - Enable **Food Diary** in Settings (disabled by default)
+   - Open the Diary screen from Tracker summary
+   - Add/edit inline rows per section (`Breakfast`, `Lunch`, `Dinner`, `Snacks`, or unsectioned)
+   - Each row supports:
+     - Name
+     - Amount
+     - Calories
+     - Optional kcal-per-100g mode for auto-calculation from grams
+   - Use **Load Suggestions** to quickly reuse foods
+
+5. **Suggestions Library**:
+   - Open from footer (restaurant icon) when diary is enabled
+   - Search by name
+   - Edit/delete suggestions
+   - Suggestions persist independently from diary rows
+   - Ranking in diary picker balances:
+     - section-specific usage,
+     - overall frequency,
+     - recency of use,
+     - recency of update
 
 ### Tips for Best Results
 
@@ -68,6 +93,7 @@ The Adaptive TDEE Tracker is a Vue 3-based mobile application that implements an
 ```bash
 npm install
 ```
+If you're working in a restricted/offline environment, run `npm install` locally outside the sandboxed agent session.
 
 #### Run Development Server
 ```bash
@@ -162,7 +188,7 @@ adb install android/app/build/outputs/apk/debug/app-debug.apk
 
 ```
 ├── src/
-│   ├── views/           # Page views (SettingsView, TrackerView, StatisticsView)
+│   ├── views/           # Page views (Settings, Tracker, Statistics, Diary, Suggestions)
 │   ├── router/          # Vue Router configuration
 │   ├── stores/          # Pinia stores
 │   ├── utils/           # Utility functions (TDEE calculations)
