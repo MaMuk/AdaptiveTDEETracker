@@ -18,7 +18,7 @@ export const useUserStore = defineStore('user', () => {
     // Diary entries: { id, date, name, amount, calories, section, usePer100g, caloriesPer100g }
     const foodDiaryEntries = ref([])
     // Suggestions are independent from diary rows and survive diary row deletion.
-    // { id, name, amount, calories, usePer100g, caloriesPer100g, updatedAt, usage, sectionUsage }
+    // { id, name, amount, calories, usePer100g, caloriesPer100g, notes, tags, updatedAt, usage, sectionUsage }
     const foodSuggestions = ref([])
     const aiMealRecognitionEnabled = ref(false)
     const openAiApiKey = ref('')
@@ -89,6 +89,13 @@ export const useUserStore = defineStore('user', () => {
             diarySectionPercentages.value = sanitizeSectionPercentages(stored.diarySectionPercentages, diarySections.value)
             foodDiaryEntries.value = Array.isArray(stored.foodDiaryEntries) ? stored.foodDiaryEntries : []
             foodSuggestions.value = Array.isArray(stored.foodSuggestions) ? stored.foodSuggestions : []
+            foodSuggestions.value = foodSuggestions.value.map((item) => ({
+                ...item,
+                notes: String(item?.notes || ''),
+                tags: Array.isArray(item?.tags)
+                    ? [...new Set(item.tags.map(tag => String(tag || '').trim()).filter(Boolean))]
+                    : []
+            }))
             aiMealRecognitionEnabled.value = Boolean(stored.aiMealRecognitionEnabled)
             openAiApiKey.value = String(stored.openAiApiKey || '')
         }
@@ -208,8 +215,9 @@ export const useUserStore = defineStore('user', () => {
         openAiApiKey.value = String(key || '').trim()
     }
 
-    function addDiaryEntry(date, entry) {
+    function addDiaryEntry(date, entry, options = {}) {
         const id = `entry_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+        const syncSuggestion = options.syncSuggestion !== false
         const normalized = {
             id,
             date,
@@ -223,12 +231,15 @@ export const useUserStore = defineStore('user', () => {
                 : null
         }
         foodDiaryEntries.value.push(normalized)
-        upsertSuggestionFromEntry(normalized)
+        if (syncSuggestion) {
+            upsertSuggestionFromEntry(normalized)
+        }
     }
 
-    function updateDiaryEntry(id, updates) {
+    function updateDiaryEntry(id, updates, options = {}) {
         const index = foodDiaryEntries.value.findIndex(entry => entry.id === id)
         if (index === -1) return
+        const syncSuggestion = options.syncSuggestion !== false
         const updated = {
             ...foodDiaryEntries.value[index],
             ...updates,
@@ -240,7 +251,9 @@ export const useUserStore = defineStore('user', () => {
                 : foodDiaryEntries.value[index].caloriesPer100g
         }
         foodDiaryEntries.value[index] = updated
-        upsertSuggestionFromEntry(updated)
+        if (syncSuggestion) {
+            upsertSuggestionFromEntry(updated)
+        }
     }
 
     function deleteDiaryEntry(id) {
@@ -282,6 +295,8 @@ export const useUserStore = defineStore('user', () => {
             caloriesPer100g: entry.caloriesPer100g !== null && entry.caloriesPer100g !== undefined
                 ? Number(entry.caloriesPer100g)
                 : null,
+            notes: existing?.notes || '',
+            tags: Array.isArray(existing?.tags) ? existing.tags : [],
             updatedAt: new Date().toISOString()
         }
         if (existing) {
@@ -315,6 +330,10 @@ export const useUserStore = defineStore('user', () => {
             caloriesPer100g: suggestion.caloriesPer100g !== null && suggestion.caloriesPer100g !== undefined
                 ? Number(suggestion.caloriesPer100g)
                 : null,
+            notes: String(suggestion.notes || ''),
+            tags: Array.isArray(suggestion.tags)
+                ? [...new Set(suggestion.tags.map(tag => String(tag || '').trim()).filter(Boolean))]
+                : [],
             updatedAt: new Date().toISOString(),
             usage: { count: 0, lastUsedAt: null },
             sectionUsage: {}
@@ -333,6 +352,10 @@ export const useUserStore = defineStore('user', () => {
             caloriesPer100g: updates.caloriesPer100g !== undefined
                 ? Number(updates.caloriesPer100g)
                 : foodSuggestions.value[index].caloriesPer100g,
+            notes: String(updates.notes ?? foodSuggestions.value[index].notes ?? ''),
+            tags: updates.tags !== undefined
+                ? [...new Set((Array.isArray(updates.tags) ? updates.tags : []).map(tag => String(tag || '').trim()).filter(Boolean))]
+                : (Array.isArray(foodSuggestions.value[index].tags) ? foodSuggestions.value[index].tags : []),
             updatedAt: new Date().toISOString(),
             usage: foodSuggestions.value[index].usage || { count: 0, lastUsedAt: null },
             sectionUsage: foodSuggestions.value[index].sectionUsage || {}
