@@ -37,7 +37,7 @@
                 <div class="text-caption text-grey-7">To reach your goal by {{ goalDateText }}</div>
                 <div class="text-h6 text-weight-bold text-primary">
                   <span @click="showCalorieBreakdown = !showCalorieBreakdown" class="cursor-pointer">
-                    {{ roundTo25(recommendedCalories) }} kcal/day
+                    {{ recommendedCalories }} kcal/day
                     <q-icon name="info" size="xs" class="q-ml-xs" />
                   </span>
                   <span v-if="showCalorieBreakdown" class="text-info text-subtitle2">{{ calorieBreakdownText }}</span>
@@ -303,7 +303,8 @@ const dayDiaryCalories = computed(() => store.sumDiaryCaloriesByDate(selectedDat
 const totalDailyBudget = computed(() => {
   if (!Number.isFinite(Number(store.calculatedTDEE)) || !Number.isFinite(Number(store.weeklyRate))) return 0
   const adjustment = (Number(store.weeklyRate) * 7700) / 7
-  return Math.max(0, Math.round(Number(store.calculatedTDEE) + adjustment))
+  const rawBudget = Math.max(0, Number(store.calculatedTDEE) + adjustment)
+  return roundTo25(rawBudget)
 })
 function sectionTargetCalories(section) {
   const key = section || '__unsectioned__'
@@ -364,8 +365,7 @@ const goalDateText = computed(() => {
 
 const recommendedCalories = computed(() => {
   if (!store.calculatedTDEE || store.weeklyRate === undefined) return '—'
-  const dailyAdjustment = (store.weeklyRate * 7700) / 7
-  return Math.round(store.calculatedTDEE + dailyAdjustment)
+  return totalDailyBudget.value
 })
 
 const sevenDayWeightDelta = computed(() => {

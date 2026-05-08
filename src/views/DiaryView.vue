@@ -298,10 +298,16 @@ const dayEntries = computed(() => store.foodDiaryEntries
   }))
   .sort((a, b) => a.id.localeCompare(b.id)))
 
+function roundTo25(val) {
+  if (val === null || val === undefined || isNaN(val)) return 0
+  return Math.round(Number(val) / 25) * 25
+}
+
 const dailyBudget = computed(() => {
   if (!Number.isFinite(Number(store.calculatedTDEE)) || !Number.isFinite(Number(store.weeklyRate))) return 0
   const adjustment = (Number(store.weeklyRate) * 7700) / 7
-  return Math.max(0, Math.round(Number(store.calculatedTDEE) + adjustment))
+  const rawBudget = Math.max(0, Number(store.calculatedTDEE) + adjustment)
+  return roundTo25(rawBudget)
 })
 
 const totalDailyBudget = computed(() => dailyBudget.value)
