@@ -13,7 +13,8 @@ export class OpenAiMealRecognitionProvider extends AiMealRecognitionProvider {
     const imageDataUrl = String(input?.imageDataUrl || '')
     const prompt = buildPrompt({
       context: input?.context,
-      isNutritionLabel: Boolean(input?.isNutritionLabel)
+      isNutritionLabel: Boolean(input?.isNutritionLabel),
+      userContext: input?.userContext
     })
 
     if (!imageDataUrl) {
@@ -105,6 +106,7 @@ export class OpenAiMealRecognitionProvider extends AiMealRecognitionProvider {
 function buildPrompt(options = {}) {
   const context = options.context === 'suggestions' ? 'suggestions' : 'diary'
   const isNutritionLabel = Boolean(options.isNutritionLabel)
+  const userContext = String(options.userContext || '').trim()
 
   const base = [
     'Estimate calories from this food photo for a calorie-only TDEE app.',
@@ -128,6 +130,11 @@ function buildPrompt(options = {}) {
   if (isNutritionLabel) {
     base.push('Focus on reading nutrition-label calories and packaged product cues.')
     base.push('If product name is unclear, use "Unnamed product" as the name.')
+  }
+
+  if (userContext) {
+    base.push('Additional context from the user (use as hint, not guaranteed):')
+    base.push(userContext)
   }
 
   return base.join(' ')

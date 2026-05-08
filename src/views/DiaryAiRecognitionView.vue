@@ -63,6 +63,16 @@
           <q-img :src="selectedImageDataUrl" fit="contain" style="max-height: 300px; border-radius: 8px;" />
         </div>
 
+        <q-input
+          v-model="additionalContext"
+          class="q-mt-md"
+          filled
+          type="textarea"
+          autogrow
+          label="Optional context for AI"
+          hint="Example: chicken wrap with garlic sauce, homemade, large portion."
+        />
+
         <div class="row q-gutter-sm q-mt-md">
           <q-btn color="primary" label="Analyze Meal" :disable="!selectedImageDataUrl || isRecognizing" :loading="isRecognizing" @click="recognizeMeal" />
           <q-btn flat label="Clear" :disable="!selectedImageDataUrl || isRecognizing" @click="clearFlow" />
@@ -169,6 +179,7 @@ const isOpeningCamera = ref(false)
 const errorMessage = ref('')
 const warningMessage = ref('')
 const demoMessage = ref('')
+const additionalContext = ref('')
 
 const sectionOptions = computed(() => ([
   { label: 'Unsectioned', value: '' },
@@ -220,6 +231,7 @@ function clearFlow() {
   warningMessage.value = ''
   demoMessage.value = ''
   errorMessage.value = ''
+  additionalContext.value = ''
 }
 
 function onImageSelected(file) {
@@ -352,7 +364,8 @@ async function recognizeMeal() {
       apiKey: store.openAiApiKey,
       imageDataUrl: preprocessed.dataUrl,
       context: 'diary',
-      isNutritionLabel: false
+      isNutritionLabel: false,
+      userContext: String(additionalContext.value || '').trim()
     })
 
     guesses.value = result.guesses

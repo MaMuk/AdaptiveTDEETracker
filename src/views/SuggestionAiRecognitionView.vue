@@ -69,6 +69,16 @@
           <q-img :src="selectedImageDataUrl" fit="contain" style="max-height: 300px; border-radius: 8px;" />
         </div>
 
+        <q-input
+          v-model="additionalContext"
+          class="q-mt-md"
+          filled
+          type="textarea"
+          autogrow
+          label="Optional context for AI"
+          hint="Example: protein bar, chocolate flavor, 55g package."
+        />
+
         <div class="row q-gutter-sm q-mt-md">
           <q-btn color="primary" label="Analyze Product" :disable="!selectedImageDataUrl || isRecognizing" :loading="isRecognizing" @click="recognize" />
           <q-btn flat label="Clear" :disable="!selectedImageDataUrl || isRecognizing" @click="clearFlow" />
@@ -167,6 +177,7 @@ const selectedGuessIndex = ref(0)
 const errorMessage = ref('')
 const warningMessage = ref('')
 const demoMessage = ref('')
+const additionalContext = ref('')
 
 const draftName = ref('')
 const draftAmount = ref('')
@@ -206,6 +217,7 @@ function clearFlow() {
   errorMessage.value = ''
   warningMessage.value = ''
   demoMessage.value = ''
+  additionalContext.value = ''
 }
 
 function onImageSelected(file) {
@@ -340,7 +352,8 @@ async function recognize() {
       apiKey: store.openAiApiKey,
       imageDataUrl: preprocessed.dataUrl,
       context: 'suggestions',
-      isNutritionLabel: isNutritionLabel.value
+      isNutritionLabel: isNutritionLabel.value,
+      userContext: String(additionalContext.value || '').trim()
     })
 
     guesses.value = result.guesses
