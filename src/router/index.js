@@ -6,6 +6,7 @@ import DiaryView from '../views/DiaryView.vue'
 import SuggestionsView from '../views/SuggestionsView.vue'
 import DiaryAiRecognitionView from '../views/DiaryAiRecognitionView.vue'
 import SuggestionAiRecognitionView from '../views/SuggestionAiRecognitionView.vue'
+import DataTransferView from '../views/DataTransferView.vue'
 
 const routes = [
     {
@@ -42,6 +43,11 @@ const routes = [
         path: '/suggestions/ai-recognition',
         name: 'SuggestionAiRecognition',
         component: SuggestionAiRecognitionView
+    },
+    {
+        path: '/settings/data-transfer',
+        name: 'DataTransfer',
+        component: DataTransferView
     }
 ]
 

@@ -13,6 +13,8 @@
     "@capacitor/camera": "7.0.2",
     "@capacitor/cli": "7.4.3",
     "@capacitor/core": "7.4.3",
+    "@capacitor/filesystem": "7.1.0",
+    "@capacitor/share": "7.0.1",
     "@quasar/extras": "1.17.0",
     "@quasar/vite-plugin": "1.10.0",
     "chart.js": "4.5.1",

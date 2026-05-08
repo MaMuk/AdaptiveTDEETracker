@@ -3,6 +3,8 @@ import { ref, computed, watch } from 'vue'
 import { calculateAdaptiveTDEE, estimateInitialTDEE } from '../utils/tdee'
 
 export const useUserStore = defineStore('user', () => {
+    const EXPORT_SCHEMA_VERSION = 1
+    const EXPORT_SECTION_KEYS = ['profile', 'logs', 'foodDiary', 'foodSuggestions']
     // User Stats
     const startWeight = ref(null)
     const goalWeight = ref(null)
@@ -390,6 +392,106 @@ export const useUserStore = defineStore('user', () => {
         }
     }
 
+    function buildExportPayload(sections = EXPORT_SECTION_KEYS) {
+        const selected = Array.isArray(sections) && sections.length > 0
+            ? sections.filter((key, index, arr) => EXPORT_SECTION_KEYS.includes(key) && arr.indexOf(key) === index)
+            : [...EXPORT_SECTION_KEYS]
+        const payload = {
+            app: 'tdee-mobileapp',
+            schemaVersion: EXPORT_SCHEMA_VERSION,
+            exportedAt: new Date().toISOString(),
+            sections: {}
+        }
+        if (selected.includes('profile')) {
+            payload.sections.profile = {
+                startWeight: startWeight.value,
+                goalWeight: goalWeight.value,
+                height: height.value,
+                weeklyRate: weeklyRate.value,
+                calculatedTDEE: calculatedTDEE.value,
+                aiMealRecognitionEnabled: aiMealRecognitionEnabled.value,
+                openAiApiKey: openAiApiKey.value
+            }
+        }
+        if (selected.includes('logs')) {
+            payload.sections.logs = {
+                logs: Array.isArray(logs.value) ? [...logs.value] : []
+            }
+        }
+        if (selected.includes('foodDiary')) {
+            payload.sections.foodDiary = {
+                foodDiaryEnabled: Boolean(foodDiaryEnabled.value),
+                diarySections: Array.isArray(diarySections.value) ? [...diarySections.value] : ['Breakfast', 'Lunch', 'Dinner', 'Snacks'],
+                diarySectionPercentages: { ...(diarySectionPercentages.value || {}) },
+                foodDiaryEntries: Array.isArray(foodDiaryEntries.value) ? [...foodDiaryEntries.value] : []
+            }
+        }
+        if (selected.includes('foodSuggestions')) {
+            payload.sections.foodSuggestions = {
+                foodSuggestions: Array.isArray(foodSuggestions.value) ? [...foodSuggestions.value] : []
+            }
+        }
+        return payload
+    }
+
+    function importFromPayload(payload, sections = EXPORT_SECTION_KEYS) {
+        if (!payload || typeof payload !== 'object') return { importedSections: [] }
+        const sourceSections = payload.sections && typeof payload.sections === 'object' ? payload.sections : payload
+        const selected = Array.isArray(sections) && sections.length > 0
+            ? sections.filter((key, index, arr) => EXPORT_SECTION_KEYS.includes(key) && arr.indexOf(key) === index)
+            : [...EXPORT_SECTION_KEYS]
+        const importedSections = []
+
+        if (selected.includes('profile') && sourceSections.profile && typeof sourceSections.profile === 'object') {
+            startWeight.value = sourceSections.profile.startWeight ?? null
+            goalWeight.value = sourceSections.profile.goalWeight ?? null
+            height.value = sourceSections.profile.height ?? null
+            weeklyRate.value = sourceSections.profile.weeklyRate ?? 0.5
+            calculatedTDEE.value = sourceSections.profile.calculatedTDEE ?? (startWeight.value ? estimateInitialTDEE(startWeight.value) : null)
+            aiMealRecognitionEnabled.value = Boolean(sourceSections.profile.aiMealRecognitionEnabled)
+            openAiApiKey.value = String(sourceSections.profile.openAiApiKey || '')
+            importedSections.push('profile')
+        }
+
+        if (selected.includes('logs') && sourceSections.logs && typeof sourceSections.logs === 'object') {
+            logs.value = Array.isArray(sourceSections.logs.logs) ? [...sourceSections.logs.logs] : []
+            importedSections.push('logs')
+        }
+
+        if (selected.includes('foodDiary') && sourceSections.foodDiary && typeof sourceSections.foodDiary === 'object') {
+            foodDiaryEnabled.value = Boolean(sourceSections.foodDiary.foodDiaryEnabled)
+            diarySections.value = Array.isArray(sourceSections.foodDiary.diarySections) && sourceSections.foodDiary.diarySections.length > 0
+                ? [...new Set(sourceSections.foodDiary.diarySections.map(section => String(section || '').trim()).filter(Boolean))]
+                : ['Breakfast', 'Lunch', 'Dinner', 'Snacks']
+            diarySectionPercentages.value = sanitizeSectionPercentages(sourceSections.foodDiary.diarySectionPercentages, diarySections.value)
+            foodDiaryEntries.value = Array.isArray(sourceSections.foodDiary.foodDiaryEntries) ? [...sourceSections.foodDiary.foodDiaryEntries] : []
+            importedSections.push('foodDiary')
+        }
+
+        if (selected.includes('foodSuggestions') && sourceSections.foodSuggestions && typeof sourceSections.foodSuggestions === 'object') {
+            foodSuggestions.value = Array.isArray(sourceSections.foodSuggestions.foodSuggestions)
+                ? sourceSections.foodSuggestions.foodSuggestions.map((item) => ({
+                    ...item,
+                    notes: String(item?.notes || ''),
+                    tags: Array.isArray(item?.tags)
+                        ? [...new Set(item.tags.map(tag => String(tag || '').trim()).filter(Boolean))]
+                        : [],
+                    usage: item?.usage || { count: 0, lastUsedAt: null },
+                    sectionUsage: item?.sectionUsage || {}
+                }))
+                : []
+            importedSections.push('foodSuggestions')
+        }
+
+        if (importedSections.includes('logs') && !importedSections.includes('profile')) {
+            calculatedTDEE.value = logs.value.length > 0
+                ? calculateAdaptiveTDEE(logs.value, calculatedTDEE.value || estimateInitialTDEE(startWeight.value || 70))
+                : (startWeight.value ? estimateInitialTDEE(startWeight.value) : null)
+        }
+
+        return { importedSections }
+    }
+
     return {
         startWeight,
         currentWeight,
@@ -425,6 +527,9 @@ export const useUserStore = defineStore('user', () => {
         addSuggestion,
         updateSuggestion,
         deleteSuggestion,
-        trackSuggestionLoad
+        trackSuggestionLoad,
+        buildExportPayload,
+        importFromPayload,
+        exportSectionKeys: EXPORT_SECTION_KEYS
     }
 })

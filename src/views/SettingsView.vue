@@ -104,6 +104,15 @@
       </q-card-actions>
 
     </q-card>
+    <q-card class="q-mb-md">
+      <q-card-section>
+        <div class="text-subtitle1">Data Backup</div>
+        <div class="text-caption q-mb-sm">Import/export data from a separate guided screen.</div>
+      </q-card-section>
+      <q-card-actions>
+        <q-btn color="primary" label="Open Import / Export" @click="router.push('/settings/data-transfer')" class="full-width" />
+      </q-card-actions>
+    </q-card>
     <!-- Reset Data -->
     <q-card class="q-mb-md">
       <q-card-section>
