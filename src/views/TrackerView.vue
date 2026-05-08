@@ -112,6 +112,9 @@
           <q-card-section>
             <div class="row items-center justify-between q-mb-sm">
               <div class="text-h6">Diary Summary</div>
+              <div class="row items-center q-gutter-sm summary-overall-bar">
+                <CalorieBudgetBar :consumed="dayDiaryCalories" :target="totalDailyBudget" max-width="220px" size="18px" />
+              </div>
               <div class="row items-center q-gutter-xs">
                 <q-btn
                   dense
@@ -123,13 +126,17 @@
                 <q-btn dense flat icon="open_in_new" label="Open Diary" @click="openDiaryForSection('')" />
               </div>
             </div>
-            <div class="text-caption q-mb-sm">Date: {{ formatDate(selectedDate) }}</div>
+            <div class="row items-center justify-between q-mb-sm">
+              <div class="text-caption">Date: {{ formatDate(selectedDate) }}</div>
+            </div>
 
             <div v-if="!isDiarySummaryCollapsed">
               <div v-if="dayDiaryEntries.length === 0" class="text-grey-7 q-mb-sm">No diary entries for this day yet.</div>
-
               <div v-for="group in diarySummaryGroups" :key="group.key" class="q-mb-sm">
-                <div class="text-subtitle2 q-mb-xs">{{ group.label }}</div>
+                <div class="row items-center justify-between q-mb-xs">
+                  <div class="text-subtitle2">{{ group.label }}</div>
+                </div>
+                <CalorieBudgetBar :consumed="group.calories" :target="group.targetCalories" max-width="320px" size="16px" />
                 <q-list bordered separator>
                   <q-item v-for="entry in group.entries" :key="entry.id">
                     <q-item-section>
@@ -202,6 +209,7 @@ import { useRouter } from 'vue-router'
 import { useUserStore } from '../stores/user'
 import { date as qDate, useQuasar } from 'quasar'
 import { QDate, QDialog } from 'quasar'
+import CalorieBudgetBar from '../components/CalorieBudgetBar.vue'
 
 const store = useUserStore()
 const router = useRouter()
@@ -250,22 +258,58 @@ const allLogs = computed(() => [...store.logs].sort((a, b) => new Date(b.date) -
 const displayedLogs = computed(() => allLogs.value.slice(0, historyLimit.value))
 const canLoadMore = computed(() => allLogs.value.length > historyLimit.value)
 
-const dayDiaryEntries = computed(() => store.getDiaryEntriesByDate(selectedDate.value))
+const dayDiaryEntries = computed(() => store.foodDiaryEntries
+  .filter(entry => entry.date === selectedDate.value)
+  .map(entry => ({
+    ...entry,
+    calories: Number(entry.calories) || 0
+  }))
+  .sort((a, b) => a.id.localeCompare(b.id)))
 
 const diarySummaryGroups = computed(() => {
   const groups = []
   const unsectioned = dayDiaryEntries.value.filter(entry => !entry.section)
-  if (unsectioned.length > 0) groups.push({ key: 'unsectioned', label: 'Unsectioned', entries: unsectioned })
+  if (unsectioned.length > 0) {
+    const calories = unsectioned.reduce((sum, entry) => sum + (Number(entry.calories) || 0), 0)
+    const targetCalories = sectionTargetCalories('')
+    groups.push({
+      key: 'unsectioned',
+      label: 'Unsectioned',
+      entries: unsectioned,
+      calories,
+      targetCalories
+    })
+  }
 
   for (const section of store.diarySections) {
     const entries = dayDiaryEntries.value.filter(entry => entry.section === section)
-    if (entries.length > 0) groups.push({ key: section, label: section, entries })
+    if (entries.length > 0) {
+      const calories = entries.reduce((sum, entry) => sum + (Number(entry.calories) || 0), 0)
+      const targetCalories = sectionTargetCalories(section)
+      groups.push({
+        key: section,
+        label: section,
+        entries,
+        calories,
+        targetCalories
+      })
+    }
   }
 
   return groups
 })
 
 const dayDiaryCalories = computed(() => store.sumDiaryCaloriesByDate(selectedDate.value))
+const totalDailyBudget = computed(() => {
+  if (!Number.isFinite(Number(store.calculatedTDEE)) || !Number.isFinite(Number(store.weeklyRate))) return 0
+  const adjustment = (Number(store.weeklyRate) * 7700) / 7
+  return Math.max(0, Math.round(Number(store.calculatedTDEE) + adjustment))
+})
+function sectionTargetCalories(section) {
+  const key = section || '__unsectioned__'
+  const percentage = Number(store.diarySectionPercentages?.[key]) || 0
+  return Math.max(0, Math.round((totalDailyBudget.value * percentage) / 100))
+}
 
 function roundTo25(val) {
   if (val === '—' || val === null || val === undefined || isNaN(val)) return '—'
@@ -505,5 +549,10 @@ function deleteEntry() {
 .slide-right-leave-to {
   transform: translateX(100%);
   opacity: 0;
+}
+
+.summary-overall-bar {
+  width: 220px;
+  min-width: 220px;
 }
 </style>

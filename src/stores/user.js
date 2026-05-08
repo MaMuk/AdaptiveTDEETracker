@@ -13,6 +13,8 @@ export const useUserStore = defineStore('user', () => {
     const logs = ref([])
     const foodDiaryEnabled = ref(false)
     const diarySections = ref(['Breakfast', 'Lunch', 'Dinner', 'Snacks'])
+    // Section calorie distribution percentages keyed by section name and '__unsectioned__'
+    const diarySectionPercentages = ref({})
     // Diary entries: { id, date, name, amount, calories, section, usePer100g, caloriesPer100g }
     const foodDiaryEntries = ref([])
     // Suggestions are independent from diary rows and survive diary row deletion.
@@ -23,6 +25,34 @@ export const useUserStore = defineStore('user', () => {
 
     // TDEE Calculation State
     const calculatedTDEE = ref(null) // Default starting point
+
+    function defaultSectionPercentages(sections) {
+        const normalizedSections = Array.isArray(sections) && sections.length > 0
+            ? sections
+            : ['Breakfast', 'Lunch', 'Dinner', 'Snacks']
+        const keys = ['__unsectioned__', ...normalizedSections]
+        const perSection = 100 / keys.length
+        const out = {}
+        let used = 0
+        for (let i = 0; i < keys.length; i += 1) {
+            const value = i === keys.length - 1 ? Math.max(0, 100 - used) : Math.round(perSection)
+            out[keys[i]] = value
+            used += value
+        }
+        return out
+    }
+
+    function sanitizeSectionPercentages(rawPercentages, sections) {
+        const sectionList = Array.isArray(sections) && sections.length > 0 ? sections : ['Breakfast', 'Lunch', 'Dinner', 'Snacks']
+        const keys = ['__unsectioned__', ...sectionList]
+        const defaults = defaultSectionPercentages(sectionList)
+        const sanitized = {}
+        for (const key of keys) {
+            const rawValue = Number(rawPercentages?.[key])
+            sanitized[key] = Number.isFinite(rawValue) && rawValue >= 0 ? rawValue : defaults[key]
+        }
+        return sanitized
+    }
 
     // Computed: Current weight from most recent log entry
     const currentWeight = computed(() => {
@@ -56,6 +86,7 @@ export const useUserStore = defineStore('user', () => {
             diarySections.value = Array.isArray(stored.diarySections) && stored.diarySections.length > 0
                 ? stored.diarySections
                 : ['Breakfast', 'Lunch', 'Dinner', 'Snacks']
+            diarySectionPercentages.value = sanitizeSectionPercentages(stored.diarySectionPercentages, diarySections.value)
             foodDiaryEntries.value = Array.isArray(stored.foodDiaryEntries) ? stored.foodDiaryEntries : []
             foodSuggestions.value = Array.isArray(stored.foodSuggestions) ? stored.foodSuggestions : []
             aiMealRecognitionEnabled.value = Boolean(stored.aiMealRecognitionEnabled)
@@ -64,7 +95,11 @@ export const useUserStore = defineStore('user', () => {
     }
 
     // Watch and save to local storage
-    watch([startWeight, goalWeight, height, weeklyRate, logs, calculatedTDEE, foodDiaryEnabled, diarySections, foodDiaryEntries, foodSuggestions, aiMealRecognitionEnabled, openAiApiKey], () => {
+    if (Object.keys(diarySectionPercentages.value).length === 0) {
+        diarySectionPercentages.value = defaultSectionPercentages(diarySections.value)
+    }
+
+    watch([startWeight, goalWeight, height, weeklyRate, logs, calculatedTDEE, foodDiaryEnabled, diarySections, diarySectionPercentages, foodDiaryEntries, foodSuggestions, aiMealRecognitionEnabled, openAiApiKey], () => {
         // If startWeight changes and we have no logs and TDEE is default/unset, estimate it
         if (logs.value.length === 0 && startWeight.value) {
             // Only update if it seems we are in setup mode or user changed start weight
@@ -89,6 +124,7 @@ export const useUserStore = defineStore('user', () => {
             calculatedTDEE: calculatedTDEE.value,
             foodDiaryEnabled: foodDiaryEnabled.value,
             diarySections: diarySections.value,
+            diarySectionPercentages: diarySectionPercentages.value,
             foodDiaryEntries: foodDiaryEntries.value,
             foodSuggestions: foodSuggestions.value,
             aiMealRecognitionEnabled: aiMealRecognitionEnabled.value,
@@ -132,6 +168,7 @@ export const useUserStore = defineStore('user', () => {
         calculatedTDEE.value = null
         foodDiaryEnabled.value = false
         diarySections.value = ['Breakfast', 'Lunch', 'Dinner', 'Snacks']
+        diarySectionPercentages.value = defaultSectionPercentages(diarySections.value)
         foodDiaryEntries.value = []
         foodSuggestions.value = []
         aiMealRecognitionEnabled.value = false
@@ -148,6 +185,19 @@ export const useUserStore = defineStore('user', () => {
             .map(section => String(section || '').trim())
             .filter(section => section.length > 0)
         diarySections.value = sanitized.length > 0 ? [...new Set(sanitized)] : ['Breakfast', 'Lunch', 'Dinner', 'Snacks']
+        diarySectionPercentages.value = sanitizeSectionPercentages(diarySectionPercentages.value, diarySections.value)
+    }
+
+    function setDiarySectionPercentage(sectionKey, percentage) {
+        const key = sectionKey || '__unsectioned__'
+        const validKeys = new Set(['__unsectioned__', ...diarySections.value])
+        if (!validKeys.has(key)) return
+        const parsed = Number(percentage)
+        if (!Number.isFinite(parsed) || parsed < 0) return
+        diarySectionPercentages.value = {
+            ...diarySectionPercentages.value,
+            [key]: parsed
+        }
     }
 
     function setAiMealRecognitionEnabled(enabled) {
@@ -328,6 +378,7 @@ export const useUserStore = defineStore('user', () => {
         calculatedTDEE,
         foodDiaryEnabled,
         diarySections,
+        diarySectionPercentages,
         foodDiaryEntries,
         foodSuggestions,
         aiMealRecognitionEnabled,
@@ -338,6 +389,7 @@ export const useUserStore = defineStore('user', () => {
         resetAll,
         setFoodDiaryEnabled,
         setDiarySections,
+        setDiarySectionPercentage,
         setAiMealRecognitionEnabled,
         setOpenAiApiKey,
         addDiaryEntry,

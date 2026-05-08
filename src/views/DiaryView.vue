@@ -20,13 +20,29 @@
           @click="openRecognition"
         />
       </q-card-actions>
+      <q-card-section class="q-pt-none">
+        <div class="row items-center justify-between q-mb-xs">
+          <div class="text-caption">Overall</div>
+        </div>
+        <CalorieBudgetBar :consumed="overallTrackedCalories" :target="totalDailyBudget" max-width="360px" size="18px" />
+      </q-card-section>
     </q-card>
 
     <q-card class="q-pa-sm">
       <div v-for="(section, idx) in allSections" :key="section.value" class="section-block">
         <q-separator v-if="idx > 0" class="q-my-sm" />
         <div class="row items-center justify-between q-mb-xs">
-          <div class="text-subtitle1">{{ section.label }}</div>
+          <div class="col q-pr-sm">
+            <div class="row items-center justify-between q-mb-xs">
+              <div class="text-subtitle1">{{ section.label }}</div>
+            </div>
+            <CalorieBudgetBar
+              :consumed="sectionTrackedCalories(section.value)"
+              :target="sectionTargetCalories(section.value)"
+              max-width="320px"
+              size="16px"
+            />
+          </div>
           <div class="row q-gutter-xs">
             <q-btn color="primary" unelevated dense icon="add" label="Add Row" @click="addRow(section.value)" />
             <q-btn color="dark" unelevated dense icon="restaurant_menu" label="Load Suggestions" @click="openSuggestionPicker(section.value)" />
@@ -129,6 +145,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { date as qDate, useQuasar } from 'quasar'
 import { QDialog, QDate } from 'quasar'
 import { useUserStore } from '../stores/user'
+import CalorieBudgetBar from '../components/CalorieBudgetBar.vue'
 
 const store = useUserStore()
 const route = useRoute()
@@ -145,6 +162,43 @@ const allSections = computed(() => ([
   { label: 'Unsectioned', value: '' },
   ...store.diarySections.map(section => ({ label: section, value: section }))
 ]))
+const dayEntries = computed(() => store.foodDiaryEntries
+  .filter(entry => entry.date === selectedDate.value)
+  .map(entry => ({
+    ...entry,
+    calories: Number(entry.calories) || 0
+  }))
+  .sort((a, b) => a.id.localeCompare(b.id)))
+
+const dailyBudget = computed(() => {
+  if (!Number.isFinite(Number(store.calculatedTDEE)) || !Number.isFinite(Number(store.weeklyRate))) return 0
+  const adjustment = (Number(store.weeklyRate) * 7700) / 7
+  return Math.max(0, Math.round(Number(store.calculatedTDEE) + adjustment))
+})
+
+const totalDailyBudget = computed(() => dailyBudget.value)
+const sectionCalories = computed(() => {
+  const map = {}
+  for (const entry of dayEntries.value) {
+    const key = entry.section || '__unsectioned__'
+    map[key] = (map[key] || 0) + (Number(entry.calories) || 0)
+  }
+  return map
+})
+const overallTrackedCalories = computed(() => Object.values(sectionCalories.value).reduce((sum, calories) => sum + calories, 0))
+function sectionKey(section) {
+  return section || '__unsectioned__'
+}
+
+function sectionTargetCalories(section) {
+  const key = sectionKey(section)
+  const percentage = Number(store.diarySectionPercentages?.[key]) || 0
+  return Math.max(0, Math.round((totalDailyBudget.value * percentage) / 100))
+}
+
+function sectionTrackedCalories(section) {
+  return sectionCalories.value[sectionKey(section)] || 0
+}
 
 const rankedSuggestions = computed(() => {
   const now = Date.now()
