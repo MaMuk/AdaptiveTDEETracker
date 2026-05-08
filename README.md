@@ -67,12 +67,46 @@ The Adaptive TDEE Tracker is a Vue 3-based mobile application that implements an
      - recency of use,
      - recency of update
 
+### Suggestion Table
+
+The Suggestions screen uses a table-based editor for reusable foods.
+
+- Columns include:
+  - Name
+  - Amount
+  - Calories
+  - kcal/100g mode fields (when enabled per item)
+  - Notes
+  - Tags
+- Typical actions:
+  - Add a new suggestion row
+  - Edit values inline
+  - Save or delete a suggestion
+- The same suggestion data is available from the Diary suggestion picker to quickly insert foods into a selected section/day.
+
 6. **Experimental AI Recognition (Enable in Settings)**:
    - Enable **Activate experimental AI meal recognition** in Settings
    - Add your own OpenAI API key in Settings (stored locally on device)
    - AI buttons are shown only when the experimental toggle is enabled
    - Images are compressed/resized client-side before request and are not persisted
    - The user always reviews/edits before saving; AI never auto-saves entries
+
+7. **Import / Export Backups**:
+   - Open **Settings → Open Import / Export**
+   - **Export**:
+     - Default behavior exports all sections into one JSON backup file
+     - You can optionally export only selected sections:
+       - Profile & core settings
+       - Logs
+       - Food Diary
+       - Food Suggestions
+   - **Import**:
+     - Select a JSON backup file and choose which sections to import
+     - Only selected sections are replaced; unselected sections stay unchanged
+   - **On Android (Capacitor)**:
+     - Export writes a temporary file and opens the native share sheet
+     - You choose where to save/send the JSON (Downloads, Drive, mail, etc.)
+   - Backups are local files and can be used to move data between devices
 
 ### Experimental AI Flows
 
@@ -141,6 +175,17 @@ The app will be available at `http://localhost:5173`
 ```bash
 npm run build
 ```
+
+#### Run TDEE Logic Test
+```bash
+npm run test:tdee
+```
+
+What this test currently covers:
+- Early first-week water-loss spike protection (baseline-dominant startup behavior)
+- Adaptation ramp over multi-week consistent logging
+- Long-gap epoch reset behavior
+- Deterministic output for the same final log dataset
 
 ### Building Android APK
 
@@ -223,15 +268,18 @@ adb install android/app/build/outputs/apk/debug/app-debug.apk
 
 ```
 ├── src/
-│   ├── views/           # Page views (Settings, Tracker, Statistics, Diary, Suggestions)
+│   ├── views/           # Page views (Settings, Tracker, Statistics, Diary, Suggestions, DataTransfer)
+│   ├── components/      # Reusable UI components (e.g. calorie budget bar)
+│   ├── services/        # Service layer (e.g. AI meal recognition providers)
 │   ├── router/          # Vue Router configuration
 │   ├── stores/          # Pinia stores
-│   ├── utils/           # Utility functions (TDEE calculations)
+│   ├── utils/           # Utility functions (adaptive TDEE + test script)
 │   ├── App.vue          # Root component
 │   └── main.js          # Application entry point
 ├── android/             # Capacitor Android platform
 ├── public/              # Static assets
 ├── capacitor.config.json # Capacitor configuration
+├── package.json         # Scripts (including `test:tdee`)
 └── vite.config.js       # Vite configuration
 ```
 

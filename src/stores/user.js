@@ -26,7 +26,9 @@ export const useUserStore = defineStore('user', () => {
     const openAiApiKey = ref('')
 
     // TDEE Calculation State
-    const calculatedTDEE = ref(null) // Default starting point
+    const baselineTDEE = ref(null)
+    const calculatedTDEE = ref(null)
+    const tdeeDetails = ref(null)
 
     function defaultSectionPercentages(sections) {
         const normalizedSections = Array.isArray(sections) && sections.length > 0
@@ -83,7 +85,9 @@ export const useUserStore = defineStore('user', () => {
             height.value = stored.height
             weeklyRate.value = stored.weeklyRate
             logs.value = stored.logs || []
-            calculatedTDEE.value = stored.calculatedTDEE || (startWeight.value ? estimateInitialTDEE(startWeight.value) : null)
+            baselineTDEE.value = stored.baselineTDEE
+                || stored.calculatedTDEE
+                || (startWeight.value ? estimateInitialTDEE(startWeight.value) : null)
             foodDiaryEnabled.value = Boolean(stored.foodDiaryEnabled)
             diarySections.value = Array.isArray(stored.diarySections) && stored.diarySections.length > 0
                 ? stored.diarySections
@@ -108,29 +112,14 @@ export const useUserStore = defineStore('user', () => {
         diarySectionPercentages.value = defaultSectionPercentages(diarySections.value)
     }
 
-    watch([startWeight, goalWeight, height, weeklyRate, logs, calculatedTDEE, foodDiaryEnabled, diarySections, diarySectionPercentages, foodDiaryEntries, foodSuggestions, aiMealRecognitionEnabled, openAiApiKey], () => {
-        // If startWeight changes and we have no logs and TDEE is default/unset, estimate it
-        if (logs.value.length === 0 && startWeight.value) {
-            // Only update if it seems we are in setup mode or user changed start weight
-            // We can just always update it if logs are empty, assuming startWeight is the best guess
-            const estimated = estimateInitialTDEE(startWeight.value)
-            if (Math.abs(calculatedTDEE.value - estimated) > 100 && calculatedTDEE.value === null) {
-                calculatedTDEE.value = estimated
-            } else if (logs.value.length === 0) {
-                // If logs are empty, keep TDEE in sync with start weight?
-                // User might have manually set TDEE? No, we don't have manual TDEE setting yet.
-                // So safe to update.
-                calculatedTDEE.value = estimated
-            }
-        }
-
+    watch([startWeight, goalWeight, height, weeklyRate, logs, foodDiaryEnabled, diarySections, diarySectionPercentages, foodDiaryEntries, foodSuggestions, aiMealRecognitionEnabled, openAiApiKey, baselineTDEE], () => {
         localStorage.setItem('tdee_user_store', JSON.stringify({
             startWeight: startWeight.value,
             goalWeight: goalWeight.value,
             height: height.value,
             weeklyRate: weeklyRate.value,
             logs: logs.value,
-            calculatedTDEE: calculatedTDEE.value,
+            baselineTDEE: baselineTDEE.value,
             foodDiaryEnabled: foodDiaryEnabled.value,
             diarySections: diarySections.value,
             diarySectionPercentages: diarySectionPercentages.value,
@@ -140,6 +129,11 @@ export const useUserStore = defineStore('user', () => {
             openAiApiKey: openAiApiKey.value
         }))
     }, { deep: true })
+
+    watch([startWeight, logs], () => {
+        baselineTDEE.value = startWeight.value ? estimateInitialTDEE(startWeight.value) : estimateInitialTDEE(70)
+        updateTDEE()
+    }, { deep: true, immediate: true })
 
     // Actions
     function addLog(date, weight, calories) {
@@ -157,7 +151,9 @@ export const useUserStore = defineStore('user', () => {
     }
 
     function updateTDEE() {
-        calculatedTDEE.value = calculateAdaptiveTDEE(logs.value, calculatedTDEE.value)
+        const result = calculateAdaptiveTDEE(logs.value, baselineTDEE.value)
+        calculatedTDEE.value = result.tdee
+        tdeeDetails.value = result
     }
 
     function deleteLog(date) {
@@ -175,6 +171,8 @@ export const useUserStore = defineStore('user', () => {
         weeklyRate.value = 0.5
         logs.value = []
         calculatedTDEE.value = null
+        baselineTDEE.value = null
+        tdeeDetails.value = null
         foodDiaryEnabled.value = false
         diarySections.value = ['Breakfast', 'Lunch', 'Dinner', 'Snacks']
         diarySectionPercentages.value = defaultSectionPercentages(diarySections.value)
@@ -408,7 +406,7 @@ export const useUserStore = defineStore('user', () => {
                 goalWeight: goalWeight.value,
                 height: height.value,
                 weeklyRate: weeklyRate.value,
-                calculatedTDEE: calculatedTDEE.value,
+                baselineTDEE: baselineTDEE.value,
                 aiMealRecognitionEnabled: aiMealRecognitionEnabled.value,
                 openAiApiKey: openAiApiKey.value
             }
@@ -447,7 +445,9 @@ export const useUserStore = defineStore('user', () => {
             goalWeight.value = sourceSections.profile.goalWeight ?? null
             height.value = sourceSections.profile.height ?? null
             weeklyRate.value = sourceSections.profile.weeklyRate ?? 0.5
-            calculatedTDEE.value = sourceSections.profile.calculatedTDEE ?? (startWeight.value ? estimateInitialTDEE(startWeight.value) : null)
+            baselineTDEE.value = sourceSections.profile.baselineTDEE
+                ?? sourceSections.profile.calculatedTDEE
+                ?? (startWeight.value ? estimateInitialTDEE(startWeight.value) : estimateInitialTDEE(70))
             aiMealRecognitionEnabled.value = Boolean(sourceSections.profile.aiMealRecognitionEnabled)
             openAiApiKey.value = String(sourceSections.profile.openAiApiKey || '')
             importedSections.push('profile')
@@ -484,10 +484,9 @@ export const useUserStore = defineStore('user', () => {
         }
 
         if (importedSections.includes('logs') && !importedSections.includes('profile')) {
-            calculatedTDEE.value = logs.value.length > 0
-                ? calculateAdaptiveTDEE(logs.value, calculatedTDEE.value || estimateInitialTDEE(startWeight.value || 70))
-                : (startWeight.value ? estimateInitialTDEE(startWeight.value) : null)
+            baselineTDEE.value = startWeight.value ? estimateInitialTDEE(startWeight.value) : estimateInitialTDEE(70)
         }
+        updateTDEE()
 
         return { importedSections }
     }
@@ -500,7 +499,9 @@ export const useUserStore = defineStore('user', () => {
         height,
         weeklyRate,
         logs,
+        baselineTDEE,
         calculatedTDEE,
+        tdeeDetails,
         foodDiaryEnabled,
         diarySections,
         diarySectionPercentages,

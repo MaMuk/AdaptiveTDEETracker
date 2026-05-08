@@ -45,6 +45,9 @@
                 <div class="text-caption text-grey-7">
                   {{ weeksToGoal }}
                 </div>
+                <div v-if="tdeeConfidenceHint" class="text-caption text-warning q-mt-xs">
+                  {{ tdeeConfidenceHint }}
+                </div>
               </q-card-section>
             </q-card>
           </div>
@@ -415,6 +418,18 @@ const calorieBreakdownText = computed(() => {
   const difference = roundTo25(recommendedCalories.value - store.calculatedTDEE)
   const sign = difference >= 0 ? '+' : '-'
   return ` (${tdee} kcal ${sign} ${Math.abs(difference)} kcal)`
+})
+
+const tdeeConfidenceHint = computed(() => {
+  const details = store.tdeeDetails
+  if (!details) return ''
+  if (details.confidence === 'baseline') {
+    return 'Early logging period detected. TDEE is weighted toward your baseline until enough trend data is available.'
+  }
+  if (details.confidence === 'low') {
+    return 'Adaptive trend is starting to contribute, but confidence is still low.'
+  }
+  return ''
 })
 
 function loadMore() {
