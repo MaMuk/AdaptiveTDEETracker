@@ -226,7 +226,7 @@ const showCalorieBreakdown = ref(false)
 const currentWeight = ref(null)
 const currentCalories = ref(null)
 const historyLimit = ref(14)
-const isDiarySummaryCollapsed = ref(false)
+const isDiarySummaryCollapsed = ref(true)
 
 const previousDayDate = computed(() => {
   const d = new Date(selectedDate.value)
@@ -515,7 +515,10 @@ function deleteEntry() {
 .carousel-container {
   width: 100%;
   position: relative;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: visible;
+  padding-top: 4px;
+  padding-bottom: 4px;
 }
 
 .day-card {
