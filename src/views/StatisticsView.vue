@@ -3,7 +3,9 @@
     <!-- Weekly Statistics Table -->
     <q-card class="q-mb-md">
       <q-card-section>
-        <div class="text-h6 q-mb-md">Weekly Statistics</div>
+        <div class="text-h6 q-mb-md">
+          Weekly Statistics
+        </div>
         <q-table
           :rows="weeklyStats"
           :columns="weeklyColumns"
@@ -14,7 +16,7 @@
           :pagination="{ rowsPerPage: 10 }"
           class="mobile-optimized-table"
         >
-          <template v-slot:body-cell-delta="props">
+          <template #body-cell-delta="props">
             <q-td :props="props">
               <span :class="getDeltaClass(props.row.delta)">
                 {{ props.row.delta }}
@@ -29,7 +31,9 @@
     <q-card class="q-mb-md">
       <q-card-section>
         <div class="row items-center justify-between q-mb-md">
-          <div class="text-h6">Weight Tracking</div>
+          <div class="text-h6">
+            Weight Tracking
+          </div>
           <q-btn-toggle
             v-model="chartZoom"
             toggle-color="dark"
@@ -40,13 +44,21 @@
               {value: 'full', icon: 'sports_score', color: 'amber-4', toggleTextColor: 'amber-4'}
             ]"
             dense
-            
           />
         </div>
-        <div v-if="hasWeightData" style="position: relative; height: 300px;">
-          <Line :data="weightChartData" :options="weightChartOptions" />
+        <div
+          v-if="hasWeightData"
+          style="position: relative; height: 300px;"
+        >
+          <Line
+            :data="weightChartData"
+            :options="weightChartOptions"
+          />
         </div>
-        <div v-else class="text-center text-grey-7 q-pa-lg">
+        <div
+          v-else
+          class="text-center text-grey-7 q-pa-lg"
+        >
           No weight data available yet
         </div>
       </q-card-section>
@@ -57,6 +69,7 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { useUserStore } from '../stores/user'
+import { addDays, diffDays, formatDateKeyLocal, parseDateKey, todayKey } from '../utils/dateKey'
 import { Line } from 'vue-chartjs'
 import {
   Chart as ChartJS,
@@ -95,14 +108,14 @@ const weeklyColumns = [
 const weeklyStats = computed(() => {
   if (!store.logs || store.logs.length === 0) return []
 
-  const sortedLogs = [...store.logs].sort((a, b) => new Date(a.date) - new Date(b.date))
+  const sortedLogs = [...store.logs].sort((a, b) => a.date.localeCompare(b.date))
   
   const weekGroups = {}
   
   sortedLogs.forEach(log => {
-    const date = new Date(log.date)
+    const date = parseDateKey(log.date)
     const weekStart = getWeekStart(date)
-    const weekKey = weekStart.toISOString().split('T')[0]
+    const weekKey = formatDateKeyLocal(weekStart)
     
     if (!weekGroups[weekKey]) {
       weekGroups[weekKey] = []
@@ -139,7 +152,7 @@ const weeklyStats = computed(() => {
       }
     }
 
-    const weekStart = new Date(weekKey)
+    const weekStart = parseDateKey(weekKey)
     
     stats.push({
       week: formatDateShort(weekStart),
@@ -154,15 +167,16 @@ const weeklyStats = computed(() => {
 })
 
 function getWeekStart(date) {
-  const d = new Date(date)
+  const d = date instanceof Date ? new Date(date) : parseDateKey(date)
   const day = d.getDay()
   const diff = d.getDate() - day + (day === 0 ? -6 : 1)
-  return new Date(d.setDate(diff))
+  d.setDate(diff)
+  return d
 }
 
 function formatDateShort(date) {
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-  const d = date instanceof Date ? date : new Date(date)
+  const d = date instanceof Date ? date : parseDateKey(date)
   return `${months[d.getMonth()]} ${d.getDate()}`
 }
 
@@ -193,7 +207,7 @@ const weightChartData = computed(() => {
 
   const sortedLogs = [...store.logs]
     .filter(log => log.weight)
-    .sort((a, b) => new Date(a.date) - new Date(b.date))
+    .sort((a, b) => a.date.localeCompare(b.date))
 
   if (sortedLogs.length === 0) {
     return {
@@ -202,8 +216,10 @@ const weightChartData = computed(() => {
     }
   }
 
-  const firstDate = new Date(sortedLogs[0].date)
-  const lastLogDate = new Date(sortedLogs[sortedLogs.length - 1].date)
+  const firstDateKey = sortedLogs[0].date
+  const lastLogDateKey = sortedLogs[sortedLogs.length - 1].date
+  const firstDate = parseDateKey(firstDateKey)
+  const lastLogDate = parseDateKey(lastLogDateKey)
   
   let goalDate = new Date(lastLogDate)
   if (store.averageWeight && store.goalWeight && store.weeklyRate !== undefined) {
@@ -213,8 +229,7 @@ const weightChartData = computed(() => {
     if (rate > 0) {
       const weeks = diff / rate
       const days = Math.round(weeks * 7)
-      goalDate = new Date()
-      goalDate.setDate(goalDate.getDate() + days)
+      goalDate = parseDateKey(addDays(todayKey(), days))
     }
   }
 
@@ -242,9 +257,9 @@ const weightChartData = computed(() => {
     return `${date.getMonth() + 1}/${date.getDate()}`
   })
   const weights = allDates.map(date => {
+    const dateKey = formatDateKeyLocal(date)
     const log = sortedLogs.find(l => {
-      const logDate = new Date(l.date)
-      return logDate.toDateString() === date.toDateString()
+      return l.date === dateKey
     })
     return log ? log.weight : null
   })
@@ -312,9 +327,10 @@ function calculateTrendLineExtended(logs, allDates, firstDate, trendEndDate) {
   if (logs.length < 2) return []
 
   const firstDateTime = firstDate.getTime()
+  const firstDateKey = formatDateKeyLocal(firstDate)
   
   const points = logs.map(log => ({
-    x: (new Date(log.date).getTime() - firstDateTime) / (1000 * 60 * 60 * 24),
+    x: diffDays(firstDateKey, log.date),
     y: log.weight
   }))
 

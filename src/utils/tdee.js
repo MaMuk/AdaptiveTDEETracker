@@ -1,34 +1,81 @@
-export const CALORIES_PER_KG = 7700
-export const MIN_LOGS_FOR_ADAPTIVE = 8
-export const FULL_TRUST_DAYS = 42
-export const HARD_GAP_DAYS = 28
-export const SOFT_GAP_DAYS = 14
-export const LARGE_WEIGHT_CHANGE_PCT = 0.03
+import { dateKeyToTime } from './dateKey.js'
 
-const DEFAULT_TDEE = 2000
-const MIN_TDEE_SANITY = 1200
-const MAX_TDEE_SANITY = 5000
+export const KCAL_PER_KG_WEIGHT_CHANGE = 7716.17
+export const MAINTENANCE_KCAL_PER_KG_BODY_WEIGHT = 28.66006
+export const TDEE_SMOOTHING_WINDOW_WEEKS = 12
 
-function clamp(value, min, max) {
-  return Math.max(min, Math.min(max, value))
+const DEFAULT_START_WEIGHT_KG = 70
+const MIN_RECOMMENDED_CALORIES = 0
+const DEFAULT_HEIGHT_CM = 170
+const DEFAULT_AGE = 30
+
+const ACTIVITY_MULTIPLIER_BY_LEVEL = {
+  very_low: 1.2,
+  low: 1.375,
+  moderate: 1.55,
+  high: 1.725,
+  very_high: 1.9
 }
 
-function toDateMs(date) {
-  return new Date(date).getTime()
-}
-
-function dayDiff(a, b) {
-  return Math.round((toDateMs(b) - toDateMs(a)) / 86400000)
-}
-
-function safeNumber(value) {
+function toNumberOrNull(value) {
   const parsed = Number(value)
   return Number.isFinite(parsed) ? parsed : null
 }
 
+function roundToStep(value, step) {
+  if (!Number.isFinite(Number(value)) || !Number.isFinite(Number(step)) || Number(step) <= 0) return null
+  return Math.round(Number(value) / Number(step)) * Number(step)
+}
+
+function normalizeLogDate(date) {
+  return String(date || '').trim().replaceAll('/', '-')
+}
+
+function toDateMs(date) {
+  return dateKeyToTime(normalizeLogDate(date))
+}
+
+function getTrackingWeeks(logs = []) {
+  const sortedLogs = [...(Array.isArray(logs) ? logs : [])]
+    .filter((entry) => entry && entry.date)
+    .map((entry) => ({
+      date: normalizeLogDate(entry.date),
+      weight: toNumberOrNull(entry.weight),
+      calories: toNumberOrNull(entry.calories)
+    }))
+    .filter((entry) => Number.isFinite(toDateMs(entry.date)))
+    .sort((a, b) => toDateMs(a.date) - toDateMs(b.date))
+
+  if (sortedLogs.length === 0) return []
+
+  const firstDateMs = toDateMs(sortedLogs[0].date)
+  const weeks = []
+
+  for (const log of sortedLogs) {
+    const dayOffset = Math.floor((toDateMs(log.date) - firstDateMs) / 86400000)
+    const weekIndex = Math.max(0, Math.floor(dayOffset / 7))
+
+    if (!weeks[weekIndex]) {
+      weeks[weekIndex] = { weights: [], calories: [] }
+    }
+
+    if (Number.isFinite(log.weight) && log.weight > 0) weeks[weekIndex].weights.push(log.weight)
+    if (Number.isFinite(log.calories) && log.calories > 0) weeks[weekIndex].calories.push(log.calories)
+  }
+
+  return weeks.filter(Boolean)
+}
+
+function calculateAverage(values = []) {
+  if (!Array.isArray(values) || values.length === 0) return null
+  const sum = values.reduce((total, value) => total + value, 0)
+  return sum / values.length
+}
+
 export function estimateInitialTDEE(weightKg) {
-  if (!weightKg) return DEFAULT_TDEE
-  return Math.round(27.78 * weightKg + 97)
+  const weight = toNumberOrNull(weightKg)
+  const effectiveWeight = Number.isFinite(weight) && weight > 0 ? weight : DEFAULT_START_WEIGHT_KG
+  return roundToStep(effectiveWeight * MAINTENANCE_KCAL_PER_KG_BODY_WEIGHT, 25)
 }
 
 export function getCompleteLogs(logs = []) {
@@ -36,202 +83,159 @@ export function getCompleteLogs(logs = []) {
     .filter((entry) => entry && entry.date)
     .map((entry) => ({
       ...entry,
-      weight: safeNumber(entry.weight),
-      calories: safeNumber(entry.calories)
+      date: normalizeLogDate(entry.date),
+      weight: toNumberOrNull(entry.weight),
+      calories: toNumberOrNull(entry.calories)
     }))
-    .filter((entry) => Number.isFinite(entry.weight) && Number.isFinite(entry.calories) && entry.weight > 0 && entry.calories > 0)
+    .filter((entry) => Number.isFinite(entry.weight) && entry.weight > 0 && Number.isFinite(entry.calories) && entry.calories > 0)
     .sort((a, b) => toDateMs(a.date) - toDateMs(b.date))
 }
 
-export function splitLogsIntoEpochs(logs = []) {
-  const complete = getCompleteLogs(logs)
-  if (complete.length === 0) return []
+export function calculateLoggedMaintenanceCalories(logs = [], startWeightKg = null) {
+  const startWeight = toNumberOrNull(startWeightKg)
+  const effectiveStartWeight = Number.isFinite(startWeight) && startWeight > 0 ? startWeight : DEFAULT_START_WEIGHT_KG
+  const weeklyLogs = getTrackingWeeks(logs)
 
-  const epochs = []
-  let current = [complete[0]]
+  if (weeklyLogs.length === 0) {
+    return estimateInitialTDEE(effectiveStartWeight)
+  }
 
-  for (let i = 1; i < complete.length; i += 1) {
-    const prev = complete[i - 1]
-    const next = complete[i]
-    const gapDays = dayDiff(prev.date, next.date)
-    const weightChangePct = prev.weight > 0 ? Math.abs(next.weight - prev.weight) / prev.weight : 0
-    // Epoch split logic:
-    // - hard split after long inactivity
-    // - soft split after medium inactivity only when bodyweight shifted materially
-    const startsNewEpoch = gapDays >= HARD_GAP_DAYS || (gapDays >= SOFT_GAP_DAYS && weightChangePct >= LARGE_WEIGHT_CHANGE_PCT)
+  const baseMaintenanceCalories = roundToStep(effectiveStartWeight * MAINTENANCE_KCAL_PER_KG_BODY_WEIGHT, 5)
+  const weekWeightAverage = weeklyLogs.map((week) => calculateAverage(week.weights))
+  const weekCalorieAverage = weeklyLogs.map((week) => calculateAverage(week.calories))
+  const weekWeightEntries = weeklyLogs.map((week) => week.weights.length)
+  const weekCalorieEntries = weeklyLogs.map((week) => week.calories.length)
 
-    if (startsNewEpoch) {
-      epochs.push(current)
-      current = [next]
-    } else {
-      current.push(next)
+  const weekMaintenanceRaw = []
+  const weekMaintenanceRounded = []
+
+  if (weekWeightEntries[0] > 0 && weekCalorieEntries[0] > 0) {
+    const firstWeekDeltaFromStart = weekWeightAverage[0] - effectiveStartWeight
+    const firstWeekMaintenance = weekCalorieAverage[0] + ((-firstWeekDeltaFromStart * KCAL_PER_KG_WEIGHT_CHANGE) / weekCalorieEntries[0])
+    weekMaintenanceRaw[0] = firstWeekMaintenance
+    weekMaintenanceRounded[0] = roundToStep(firstWeekMaintenance, 5)
+  } else {
+    weekMaintenanceRaw[0] = baseMaintenanceCalories
+    weekMaintenanceRounded[0] = baseMaintenanceCalories
+  }
+
+  for (let weekIndex = 1; weekIndex < weeklyLogs.length; weekIndex += 1) {
+    const hasFullCurrentWeek = weekWeightEntries[weekIndex] >= 7 && weekCalorieEntries[weekIndex] >= 7
+
+    if (!hasFullCurrentWeek || !Number.isFinite(weekWeightAverage[weekIndex - 1])) {
+      weekMaintenanceRaw[weekIndex] = weekMaintenanceRaw[weekIndex - 1]
+      weekMaintenanceRounded[weekIndex] = weekMaintenanceRounded[weekIndex - 1]
+      continue
     }
+
+    const weeklyWeightDelta = weekWeightAverage[weekIndex] - weekWeightAverage[weekIndex - 1]
+    const observedWeekMaintenance = weekCalorieAverage[weekIndex] + ((-weeklyWeightDelta * KCAL_PER_KG_WEIGHT_CHANGE) / weekCalorieEntries[weekIndex])
+
+    const weeksInBlend = Math.min(weekIndex + 1, TDEE_SMOOTHING_WINDOW_WEEKS)
+    const blendStartIndex = Math.max(0, weekIndex - (weeksInBlend - 1))
+    const previousRoundedMaintenanceSum = weekMaintenanceRounded
+      .slice(blendStartIndex, weekIndex)
+      .reduce((sum, value) => sum + (Number.isFinite(value) ? value : 0), 0)
+
+    const blendedMaintenance = (observedWeekMaintenance + previousRoundedMaintenanceSum) / weeksInBlend
+    weekMaintenanceRaw[weekIndex] = blendedMaintenance
+    weekMaintenanceRounded[weekIndex] = roundToStep(blendedMaintenance, 5)
   }
 
-  if (current.length > 0) epochs.push(current)
-  return epochs
-}
-
-export function getCurrentEpoch(logs = []) {
-  const epochs = splitLogsIntoEpochs(logs)
-  if (epochs.length === 0) return null
-  return epochs[epochs.length - 1]
-}
-
-export function computeWeightSlope(entries = []) {
-  const validEntries = entries.filter((e) => Number.isFinite(e.weight))
-  const n = validEntries.length
-  if (n < 2) return 0
-
-  const firstDate = toDateMs(validEntries[0].date)
-
-  let sumX = 0
-  let sumY = 0
-  let sumXY = 0
-  let sumXX = 0
-
-  for (let i = 0; i < n; i += 1) {
-    const entryDate = toDateMs(validEntries[i].date)
-    const x = (entryDate - firstDate) / 86400000
-    const y = validEntries[i].weight
-
-    sumX += x
-    sumY += y
-    sumXY += x * y
-    sumXX += x * x
+  const latestMaintenance = weekMaintenanceRaw[weekMaintenanceRaw.length - 1]
+  if (!Number.isFinite(latestMaintenance)) {
+    return estimateInitialTDEE(effectiveStartWeight)
   }
 
-  const denominator = (n * sumXX) - (sumX * sumX)
-  if (denominator === 0) return 0
-
-  return (n * sumXY - sumX * sumY) / denominator
+  return roundToStep(latestMaintenance, 25)
 }
 
-export function computeAverageCalories(entries = []) {
-  const valid = entries.filter((e) => Number.isFinite(e.calories) && e.calories > 0)
-  if (valid.length === 0) return 0
-  return valid.reduce((acc, e) => acc + e.calories, 0) / valid.length
+export function calculateDailyCalorieAdjustment(weeklyRateKg) {
+  const weeklyRate = Math.abs(Number(weeklyRateKg))
+  if (!Number.isFinite(weeklyRate) || weeklyRate <= 0) return 0
+  const rawAdjustment = (weeklyRate * KCAL_PER_KG_WEIGHT_CHANGE) / 7
+  return roundToStep(rawAdjustment, 5) || 0
 }
 
-export function computeObservedTDEE(entries = []) {
-  const avgCalories = computeAverageCalories(entries)
-  if (!avgCalories) return null
-  const slopeKgPerDay = computeWeightSlope(entries)
-  return avgCalories - (slopeKgPerDay * CALORIES_PER_KG)
+export function calculateMifflinStJeorBmr({ weightKg, heightCm, ageYears, sex }) {
+  const safeWeight = Number.isFinite(Number(weightKg)) && Number(weightKg) > 0 ? Number(weightKg) : DEFAULT_START_WEIGHT_KG
+  const safeHeight = Number.isFinite(Number(heightCm)) && Number(heightCm) > 0 ? Number(heightCm) : DEFAULT_HEIGHT_CM
+  const safeAge = Number.isFinite(Number(ageYears)) && Number(ageYears) > 0 ? Number(ageYears) : DEFAULT_AGE
+  const sexOffset = String(sex || '').toLowerCase() === 'female' ? -161 : 5
+  return (10 * safeWeight) + (6.25 * safeHeight) - (5 * safeAge) + sexOffset
 }
 
-export function adaptiveTrust(daysTracked, completeLogCount) {
-  // Trust ramp: no adaptation during the first week, then progressively trust observed trend
-  // as both elapsed days and complete logs accumulate.
-  if (daysTracked < 8) return 0
-  const dayTrust = clamp((daysTracked - 8) / (FULL_TRUST_DAYS - 8), 0, 1)
-  const logTrust = clamp((completeLogCount - MIN_LOGS_FOR_ADAPTIVE) / (FULL_TRUST_DAYS - MIN_LOGS_FOR_ADAPTIVE), 0, 1)
-  return Math.round((dayTrust * logTrust) * 1000) / 1000
+export function calculateActivityBasedMaintenanceCalories({ weightKg, heightCm, ageYears, sex, activityLevel }) {
+  const bmr = calculateMifflinStJeorBmr({ weightKg, heightCm, ageYears, sex })
+  const multiplier = ACTIVITY_MULTIPLIER_BY_LEVEL[String(activityLevel || '').toLowerCase()] || ACTIVITY_MULTIPLIER_BY_LEVEL.low
+  return roundToStep(bmr * multiplier, 25)
 }
 
-export function startupCap(daysTracked) {
-  // Startup guardrail against early water/glycogen shifts causing unrealistic observed TDEE.
-  if (daysTracked < 14) return 150
-  if (daysTracked < 21) return 300
-  if (daysTracked < 28) return 500
-  if (daysTracked < 42) return 750
-  return 1200
+export function blendMaintenanceCalories({ loggedMaintenanceCalories, activityBasedMaintenanceCalories, manualBias }) {
+  const logged = Number(loggedMaintenanceCalories)
+  const activity = Number(activityBasedMaintenanceCalories)
+  if (!Number.isFinite(logged) && !Number.isFinite(activity)) return null
+  if (!Number.isFinite(logged)) return activity
+  if (!Number.isFinite(activity)) return logged
+  const bias = Number.isFinite(Number(manualBias))
+    ? Math.max(0, Math.min(1, Number(manualBias)))
+    : 0
+  const blended = (logged * (1 - bias)) + (activity * bias)
+  return roundToStep(blended, 25)
 }
 
-function blendBaselineWithHistory(baseBaseline, previousEpoch, currentEpoch) {
-  if (!previousEpoch || previousEpoch.length < MIN_LOGS_FOR_ADAPTIVE || !currentEpoch || currentEpoch.length === 0) {
-    return { baseline: baseBaseline, historyTrust: 0, previousReliableTDEE: null }
+export function computeCalorieTarget(maintenanceCalories, weeklyRateKg, context = {}) {
+  const maintenance = Number(maintenanceCalories)
+  if (!Number.isFinite(maintenance)) return 0
+
+  const goalWeight = toNumberOrNull(context.goalWeight)
+  const currentWeight = toNumberOrNull(context.currentWeight)
+
+  const hasGoalContext = Number.isFinite(goalWeight) && Number.isFinite(currentWeight)
+  let direction = 0
+  if (hasGoalContext) {
+    direction = goalWeight === currentWeight ? 0 : goalWeight > currentWeight ? 1 : -1
+  } else {
+    const weeklyRate = Number(weeklyRateKg)
+    direction = weeklyRate === 0 ? 0 : weeklyRate > 0 ? 1 : -1
   }
 
-  const previousReliableTDEE = computeObservedTDEE(previousEpoch)
-  if (!Number.isFinite(previousReliableTDEE)) {
-    return { baseline: baseBaseline, historyTrust: 0, previousReliableTDEE: null }
-  }
+  const adjustment = calculateDailyCalorieAdjustment(weeklyRateKg)
+  const target = direction === 0
+    ? maintenance
+    : direction > 0
+      ? maintenance + adjustment
+      : maintenance - adjustment
 
-  const previousLast = previousEpoch[previousEpoch.length - 1]
-  const currentFirst = currentEpoch[0]
-  const gapDays = Math.max(0, dayDiff(previousLast.date, currentFirst.date))
-  const currentWeight = currentFirst.weight
-  const previousWeight = previousLast.weight
-
-  const recencyTrust = Math.exp(-gapDays / 90)
-  const weightShift = previousWeight > 0 ? Math.abs(currentWeight - previousWeight) / previousWeight : 1
-  const weightTrust = clamp(1 - (weightShift / 0.1), 0, 1)
-
-  const previousEpochDays = Math.max(1, dayDiff(previousEpoch[0].date, previousLast.date) + 1)
-  const reliabilityTrust = clamp(previousEpochDays / FULL_TRUST_DAYS, 0, 1)
-  const historyTrust = clamp(recencyTrust * weightTrust * reliabilityTrust, 0, 1)
-
-  const blended = (baseBaseline * (1 - historyTrust)) + (previousReliableTDEE * historyTrust)
-  return { baseline: blended, historyTrust, previousReliableTDEE }
+  return Math.max(MIN_RECOMMENDED_CALORIES, target)
 }
 
-export function calculateAdaptiveTDEE(logs = [], baselineTDEE = null, options = {}) {
-  const completeLogs = getCompleteLogs(logs)
-  const epochs = splitLogsIntoEpochs(completeLogs)
-  const currentEpoch = epochs.length > 0 ? epochs[epochs.length - 1] : []
-  const previousEpoch = epochs.length > 1 ? epochs[epochs.length - 2] : null
+export function calculateAdaptiveTDEE(logs = [], baselineTDEE = null) {
+  const baseline = Number.isFinite(Number(baselineTDEE))
+    ? roundToStep(Number(baselineTDEE), 25)
+    : estimateInitialTDEE(DEFAULT_START_WEIGHT_KG)
 
-  const hasCurrentWeight = currentEpoch.length > 0 ? currentEpoch[currentEpoch.length - 1].weight : null
-  const fallbackBaseline = estimateInitialTDEE(hasCurrentWeight)
-  const baseBaseline = Number.isFinite(Number(baselineTDEE))
-    ? Number(baselineTDEE)
-    : fallbackBaseline
-
-  const { baseline: historyAdjustedBaseline } = blendBaselineWithHistory(baseBaseline, previousEpoch, currentEpoch)
-
-  const logCount = currentEpoch.length
-  const epochStartDate = logCount > 0 ? currentEpoch[0].date : null
-  const epochEndDate = logCount > 0 ? currentEpoch[logCount - 1].date : null
-  const daysTracked = epochStartDate && epochEndDate ? Math.max(1, dayDiff(epochStartDate, epochEndDate) + 1) : 0
-
-  const observedTDEE = computeObservedTDEE(currentEpoch)
-  const trust = adaptiveTrust(daysTracked, logCount)
-  const capDelta = startupCap(daysTracked)
-
-  const cappedObservedTDEE = Number.isFinite(observedTDEE)
-    ? clamp(observedTDEE, historyAdjustedBaseline - capDelta, historyAdjustedBaseline + capDelta)
-    : null
-
-  const mode = trust <= 0 || !Number.isFinite(cappedObservedTDEE)
-    ? 'baseline'
-    : trust >= 0.95
-      ? 'adaptive'
-      : 'blended'
-
-  const blendedTdee = Number.isFinite(cappedObservedTDEE)
-    ? (historyAdjustedBaseline * (1 - trust)) + (cappedObservedTDEE * trust)
-    : historyAdjustedBaseline
-
-  const finalTDEE = clamp(Math.round(blendedTdee), MIN_TDEE_SANITY, MAX_TDEE_SANITY)
-
-  const confidence = trust < 0.2
-    ? 'baseline'
-    : trust < 0.5
-      ? 'low'
-      : trust < 0.8
-        ? 'medium'
-        : 'high'
+  const maintenanceCalories = calculateLoggedMaintenanceCalories(logs, null)
+  const completeLogCount = getCompleteLogs(logs).length
 
   return {
-    tdee: finalTDEE,
-    baselineTDEE: Math.round(historyAdjustedBaseline),
-    observedTDEE: Number.isFinite(observedTDEE) ? Math.round(observedTDEE) : null,
-    cappedObservedTDEE: Number.isFinite(cappedObservedTDEE) ? Math.round(cappedObservedTDEE) : null,
-    trust,
-    confidence,
-    mode,
-    daysTracked,
-    logCount,
-    epochStartDate,
-    detectedNewEpoch: epochs.length > 1,
-    epochCount: epochs.length,
-    completeLogCount: completeLogs.length,
-    optionsUsed: options
+    tdee: maintenanceCalories,
+    baselineTDEE: baseline,
+    observedTDEE: maintenanceCalories,
+    cappedObservedTDEE: maintenanceCalories,
+    trust: completeLogCount > 0 ? 1 : 0,
+    appliedManualBias: 0,
+    effectiveTrust: completeLogCount > 0 ? 1 : 0,
+    manualBias: 0,
+    confidence: completeLogCount >= 7 ? 'high' : completeLogCount > 0 ? 'low' : 'baseline',
+    mode: 'logged-trend',
+    daysTracked: completeLogCount,
+    logCount: completeLogCount,
+    epochStartDate: completeLogCount > 0 ? getCompleteLogs(logs)[0].date : null,
+    epochEndDate: completeLogCount > 0 ? getCompleteLogs(logs)[completeLogCount - 1].date : null,
+    detectedNewEpoch: false,
+    epochCount: completeLogCount > 0 ? 1 : 0,
+    completeLogCount,
+    optionsUsed: {}
   }
-}
-
-export function computeCalorieTarget(adaptiveTDEE, weeklyRate) {
-  const adjustmentPerDay = (weeklyRate * CALORIES_PER_KG) / 7
-  return adaptiveTDEE + adjustmentPerDay
 }

@@ -2,20 +2,31 @@
   <q-page padding>
     <q-card class="q-mb-md">
       <q-card-section>
-        <div class="text-subtitle1">Data Import / Export</div>
+        <div class="text-subtitle1">
+          Data Import / Export
+        </div>
         <div class="text-caption q-mt-xs">
           Export all data by default, or target specific sections. Imports only modify selected sections.
         </div>
       </q-card-section>
       <q-card-actions align="left">
-        <q-btn flat icon="arrow_back" label="Back to Settings" @click="router.push('/settings')" />
+        <q-btn
+          flat
+          icon="arrow_back"
+          label="Back to Settings"
+          @click="router.push('/settings')"
+        />
       </q-card-actions>
     </q-card>
 
     <q-card class="q-mb-md">
       <q-card-section>
-        <div class="text-subtitle1">Export</div>
-        <div class="text-caption q-mb-sm">Default is all sections.</div>
+        <div class="text-subtitle1">
+          Export
+        </div>
+        <div class="text-caption q-mb-sm">
+          Default is all sections.
+        </div>
         <q-toggle
           v-for="section in sections"
           :key="`export-${section.key}`"
@@ -25,13 +36,19 @@
         />
       </q-card-section>
       <q-card-actions>
-        <q-btn color="primary" label="Export JSON" @click="exportJson" />
+        <q-btn
+          color="primary"
+          label="Export JSON"
+          @click="exportJson"
+        />
       </q-card-actions>
     </q-card>
 
     <q-card class="q-mb-md">
       <q-card-section>
-        <div class="text-subtitle1">Import</div>
+        <div class="text-subtitle1">
+          Import
+        </div>
         <q-file
           v-model="importFile"
           filled
@@ -40,10 +57,17 @@
           class="q-mb-sm"
           @update:model-value="onFileSelected"
         />
-        <div v-if="importError" class="text-negative text-caption q-mb-sm">{{ importError }}</div>
+        <div
+          v-if="importError"
+          class="text-negative text-caption q-mb-sm"
+        >
+          {{ importError }}
+        </div>
 
         <div v-if="availableImportSections.length > 0">
-          <div class="text-caption q-mb-sm">Choose sections to import (only selected sections are modified):</div>
+          <div class="text-caption q-mb-sm">
+            Choose sections to import (only selected sections are modified):
+          </div>
           <q-toggle
             v-for="section in availableImportSections"
             :key="`import-${section.key}`"
@@ -54,7 +78,12 @@
         </div>
       </q-card-section>
       <q-card-actions>
-        <q-btn color="positive" label="Import Selected" :disable="!canImport" @click="confirmImport" />
+        <q-btn
+          color="positive"
+          label="Import Selected"
+          :disable="!canImport"
+          @click="confirmImport"
+        />
       </q-card-actions>
     </q-card>
   </q-page>
@@ -68,6 +97,7 @@ import { Capacitor } from '@capacitor/core'
 import { Filesystem, Directory } from '@capacitor/filesystem'
 import { Share } from '@capacitor/share'
 import { useUserStore } from '../stores/user'
+import { todayKey } from '../utils/dateKey'
 
 const router = useRouter()
 const $q = useQuasar()
@@ -77,7 +107,8 @@ const sections = [
   { key: 'profile', label: 'Profile & core settings' },
   { key: 'logs', label: 'Logs' },
   { key: 'foodDiary', label: 'Food Diary' },
-  { key: 'foodSuggestions', label: 'Food Suggestions' }
+  { key: 'foodSuggestions', label: 'Food Suggestions' },
+  { key: 'appSettings', label: 'App Settings' }
 ]
 
 const exportSelection = ref(sections.reduce((acc, section) => {
@@ -116,7 +147,7 @@ async function exportJson() {
   const selected = selectedKeys(exportSelection)
   const payload = store.buildExportPayload(selected.length > 0 ? selected : store.exportSectionKeys)
   const jsonText = JSON.stringify(payload, null, 2)
-  const date = new Date().toISOString().slice(0, 10)
+  const date = todayKey()
   const filename = `tdee-backup-${date}.json`
 
   try {
@@ -183,7 +214,6 @@ function confirmImport() {
   $q.dialog({
     title: 'Import Data',
     message: 'Selected sections will be replaced with the file content. Unselected sections are unchanged.',
-    cancel: true,
     persistent: true,
     ok: { label: 'Import', color: 'positive' },
     cancel: { label: 'Cancel', color: 'primary' }

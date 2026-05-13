@@ -1,5 +1,8 @@
 <template>
-  <div class="calorie-budget-bar" :style="{ maxWidth }">
+  <div
+    class="calorie-budget-bar"
+    :style="{ maxWidth }"
+  >
     <q-linear-progress
       :value="progressValue"
       :color="barColor"
@@ -7,7 +10,9 @@
       rounded
       :size="size"
     />
-    <div class="bar-label">{{ labelText }}</div>
+    <div class="bar-label">
+      {{ labelText }}
+    </div>
   </div>
 </template>
 
@@ -18,7 +23,8 @@ const props = defineProps({
   consumed: { type: Number, default: 0 },
   target: { type: Number, default: 0 },
   maxWidth: { type: String, default: '280px' },
-  size: { type: String, default: '16px' }
+  size: { type: String, default: '16px' },
+  gainMode: { type: Boolean, default: false }
 })
 
 const progressValue = computed(() => {
@@ -34,9 +40,9 @@ const barColor = computed(() => {
   const target = Number(props.target)
   if (!Number.isFinite(consumed) || consumed <= 0) return 'grey-4'
   if (!Number.isFinite(target) || target <= 0) return 'red-3'
-  if (consumed < target) return 'green-3'
+  if (consumed < target) return props.gainMode ? 'red-3' : 'green-3'
   if (consumed === target) return 'amber-3'
-  return 'red-3'
+  return props.gainMode ? 'green-3' : 'red-3'
 })
 
 const labelText = computed(() => `${Math.round(Number(props.consumed) || 0)}kcal/${Math.round(Number(props.target) || 0)}kcal`)

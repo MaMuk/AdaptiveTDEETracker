@@ -1,21 +1,49 @@
 <template>
   <q-layout view="hHh lpR fFf">
-
-
     <q-page-container>
       <router-view />
     </q-page-container>
-    <q-footer elevated class="bg-primary text-white">
+    <q-footer
+      elevated
+      class="bg-primary text-white"
+    >
       <q-toolbar>
-        <q-btn dense text-color="accent" icon="home" to="/" />
+        <q-btn
+          dense
+          text-color="accent"
+          icon="home"
+          to="/"
+        />
         <q-space v-if="store.foodDiaryEnabled" />
-        <q-btn v-if="store.foodDiaryEnabled" dense text-color="accent" icon="event_note" to="/diary" />
+        <q-btn
+          v-if="store.foodDiaryEnabled"
+          dense
+          text-color="accent"
+          icon="event_note"
+          to="/diary"
+        />
         <q-space />
-        <q-btn dense text-color="accent" icon="insert_chart" to="/statistics" />
+        <q-btn
+          dense
+          text-color="accent"
+          icon="insert_chart"
+          to="/statistics"
+        />
         <q-space v-if="store.foodDiaryEnabled" />
-        <q-btn v-if="store.foodDiaryEnabled" dense text-color="accent" icon="history" to="/suggestions" />
+        <q-btn
+          v-if="store.foodDiaryEnabled"
+          dense
+          text-color="accent"
+          icon="history"
+          to="/suggestions"
+        />
         <q-space />
-        <q-btn dense text-color="accent" icon="settings" to="/settings" />
+        <q-btn
+          dense
+          text-color="accent"
+          icon="settings"
+          to="/settings"
+        />
       </q-toolbar>
     </q-footer>
   </q-layout>

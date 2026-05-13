@@ -1,494 +1,134 @@
 import { defineStore } from 'pinia'
-import { ref, computed, watch } from 'vue'
-import { calculateAdaptiveTDEE, estimateInitialTDEE } from '../utils/tdee'
+import { computed } from 'vue'
+import { useProfileLogsTdeeStore } from './domains/profileLogsTdee'
+import { useDiaryStore } from './domains/diary'
+import { useSuggestionsStore } from './domains/suggestions'
+import { useAiSettingsStore } from './domains/aiSettings'
+import { useAppSettingsStore } from './domains/appSettings'
+import { useDataTransferStore } from './domains/dataTransfer'
+
+const LEGACY_STORAGE_KEY = 'tdee_user_store'
+const PROFILE_STORAGE_KEY = 'tdee_profile_logs_tdee_store'
+const DIARY_STORAGE_KEY = 'tdee_diary_store'
+const SUGGESTIONS_STORAGE_KEY = 'tdee_suggestions_store'
+const AI_STORAGE_KEY = 'tdee_ai_settings_store'
+const APP_SETTINGS_STORAGE_KEY = 'tdee_app_settings_store'
+
+function migrateLegacyStoreIfNeeded() {
+    const hasNewStores = localStorage.getItem(PROFILE_STORAGE_KEY)
+        || localStorage.getItem(DIARY_STORAGE_KEY)
+        || localStorage.getItem(SUGGESTIONS_STORAGE_KEY)
+        || localStorage.getItem(AI_STORAGE_KEY)
+        || localStorage.getItem(APP_SETTINGS_STORAGE_KEY)
+    if (hasNewStores) return
+
+    const legacyRaw = localStorage.getItem(LEGACY_STORAGE_KEY)
+    if (!legacyRaw) return
+
+    let legacy
+    try {
+        legacy = JSON.parse(legacyRaw)
+    } catch {
+        return
+    }
+    if (!legacy || typeof legacy !== 'object') return
+
+    localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify({
+        startWeight: legacy.startWeight,
+        goalWeight: legacy.goalWeight,
+        height: legacy.height,
+        age: legacy.age ?? null,
+        sex: legacy.sex === 'female' ? 'female' : 'male',
+        weeklyRate: legacy.weeklyRate,
+        logs: Array.isArray(legacy.logs) ? legacy.logs : [],
+        baselineTDEE: legacy.baselineTDEE || legacy.calculatedTDEE || null
+    }))
+
+    localStorage.setItem(DIARY_STORAGE_KEY, JSON.stringify({
+        foodDiaryEnabled: Boolean(legacy.foodDiaryEnabled),
+        diarySections: Array.isArray(legacy.diarySections) && legacy.diarySections.length > 0
+            ? legacy.diarySections
+            : ['Breakfast', 'Lunch', 'Dinner', 'Snacks'],
+        diarySectionPercentages: legacy.diarySectionPercentages || {},
+        foodDiaryEntries: Array.isArray(legacy.foodDiaryEntries) ? legacy.foodDiaryEntries : [],
+        diaryClosedSectionsByDate: legacy.diaryClosedSectionsByDate || {},
+        diaryBudgetSnapshotsByDate: legacy.diaryBudgetSnapshotsByDate || {}
+    }))
+
+    localStorage.setItem(SUGGESTIONS_STORAGE_KEY, JSON.stringify({
+        foodSuggestions: Array.isArray(legacy.foodSuggestions) ? legacy.foodSuggestions : []
+    }))
+
+    localStorage.setItem(AI_STORAGE_KEY, JSON.stringify({
+        aiMealRecognitionEnabled: Boolean(legacy.aiMealRecognitionEnabled),
+        openAiApiKey: String(legacy.openAiApiKey || '')
+    }))
+
+    localStorage.setItem(APP_SETTINGS_STORAGE_KEY, JSON.stringify({
+        suggestionsVisibleColumns: legacy.suggestionsVisibleColumns || undefined
+    }))
+}
 
 export const useUserStore = defineStore('user', () => {
-    const EXPORT_SCHEMA_VERSION = 1
-    const EXPORT_SECTION_KEYS = ['profile', 'logs', 'foodDiary', 'foodSuggestions']
-    // User Stats
-    const startWeight = ref(null)
-    const goalWeight = ref(null)
-    const height = ref(null)
-    const weeklyRate = ref(null) // kg per week
+    migrateLegacyStoreIfNeeded()
 
-    // Logs: Array of { date: 'YYYY-MM-DD', weight: number, calories: number }
-    const logs = ref([])
-    const foodDiaryEnabled = ref(false)
-    const diarySections = ref(['Breakfast', 'Lunch', 'Dinner', 'Snacks'])
-    // Section calorie distribution percentages keyed by section name and '__unsectioned__'
-    const diarySectionPercentages = ref({})
-    // Diary entries: { id, date, name, amount, calories, section, usePer100g, caloriesPer100g }
-    const foodDiaryEntries = ref([])
-    // Suggestions are independent from diary rows and survive diary row deletion.
-    // { id, name, amount, calories, usePer100g, caloriesPer100g, notes, tags, updatedAt, usage, sectionUsage }
-    const foodSuggestions = ref([])
-    const aiMealRecognitionEnabled = ref(false)
-    const openAiApiKey = ref('')
+    const profileStore = useProfileLogsTdeeStore()
+    const diaryStore = useDiaryStore()
+    const suggestionsStore = useSuggestionsStore()
+    const aiStore = useAiSettingsStore()
+    const appSettingsStore = useAppSettingsStore()
+    const dataTransferStore = useDataTransferStore()
 
-    // TDEE Calculation State
-    const baselineTDEE = ref(null)
-    const calculatedTDEE = ref(null)
-    const tdeeDetails = ref(null)
+    const startWeight = computed({ get: () => profileStore.startWeight, set: (v) => { profileStore.startWeight = v } })
+    const goalWeight = computed({ get: () => profileStore.goalWeight, set: (v) => { profileStore.goalWeight = v } })
+    const height = computed({ get: () => profileStore.height, set: (v) => { profileStore.height = v } })
+    const age = computed({ get: () => profileStore.age, set: (v) => { profileStore.age = v } })
+    const sex = computed({ get: () => profileStore.sex, set: (v) => { profileStore.sex = v } })
+    const weeklyRate = computed({ get: () => profileStore.weeklyRate, set: (v) => { profileStore.weeklyRate = v } })
+    const logs = computed({ get: () => profileStore.logs, set: (v) => { profileStore.logs = v } })
+    const baselineTDEE = computed({ get: () => profileStore.baselineTDEE, set: (v) => { profileStore.baselineTDEE = v } })
+    const tdeeSnapshotsByDate = computed({ get: () => profileStore.tdeeSnapshotsByDate, set: (v) => { profileStore.tdeeSnapshotsByDate = v } })
+    const calculatedTDEE = computed(() => profileStore.calculatedTDEE)
+    const tdeeDetails = computed(() => profileStore.tdeeDetails)
+    const currentWeight = computed(() => profileStore.currentWeight)
+    const averageWeight = computed(() => profileStore.averageWeight)
 
-    function defaultSectionPercentages(sections) {
-        const normalizedSections = Array.isArray(sections) && sections.length > 0
-            ? sections
-            : ['Breakfast', 'Lunch', 'Dinner', 'Snacks']
-        const keys = ['__unsectioned__', ...normalizedSections]
-        const perSection = 100 / keys.length
-        const out = {}
-        let used = 0
-        for (let i = 0; i < keys.length; i += 1) {
-            const value = i === keys.length - 1 ? Math.max(0, 100 - used) : Math.round(perSection)
-            out[keys[i]] = value
-            used += value
-        }
-        return out
-    }
+    const foodDiaryEnabled = computed({ get: () => diaryStore.foodDiaryEnabled, set: (v) => { diaryStore.foodDiaryEnabled = v } })
+    const diarySections = computed({ get: () => diaryStore.diarySections, set: (v) => { diaryStore.diarySections = v } })
+    const diarySectionPercentages = computed({ get: () => diaryStore.diarySectionPercentages, set: (v) => { diaryStore.diarySectionPercentages = v } })
+    const foodDiaryEntries = computed({ get: () => diaryStore.foodDiaryEntries, set: (v) => { diaryStore.foodDiaryEntries = v } })
+    const diaryClosedSectionsByDate = computed({ get: () => diaryStore.diaryClosedSectionsByDate, set: (v) => { diaryStore.diaryClosedSectionsByDate = v } })
+    const diaryBudgetSnapshotsByDate = computed({ get: () => diaryStore.diaryBudgetSnapshotsByDate, set: (v) => { diaryStore.diaryBudgetSnapshotsByDate = v } })
 
-    function sanitizeSectionPercentages(rawPercentages, sections) {
-        const sectionList = Array.isArray(sections) && sections.length > 0 ? sections : ['Breakfast', 'Lunch', 'Dinner', 'Snacks']
-        const keys = ['__unsectioned__', ...sectionList]
-        const defaults = defaultSectionPercentages(sectionList)
-        const sanitized = {}
-        for (const key of keys) {
-            const rawValue = Number(rawPercentages?.[key])
-            sanitized[key] = Number.isFinite(rawValue) && rawValue >= 0 ? rawValue : defaults[key]
-        }
-        return sanitized
-    }
+    const foodSuggestions = computed({ get: () => suggestionsStore.foodSuggestions, set: (v) => { suggestionsStore.foodSuggestions = v } })
 
-    // Computed: Current weight from most recent log entry
-    const currentWeight = computed(() => {
-        if (logs.value.length === 0) return startWeight.value
-        const sortedLogs = [...logs.value].sort((a, b) => new Date(b.date) - new Date(a.date))
-        return sortedLogs[0].weight || startWeight.value
+    const aiMealRecognitionEnabled = computed({ get: () => aiStore.aiMealRecognitionEnabled, set: (v) => { aiStore.aiMealRecognitionEnabled = v } })
+    const openAiApiKey = computed({ get: () => aiStore.openAiApiKey, set: (v) => { aiStore.openAiApiKey = v } })
+    const appSettings = computed({ get: () => appSettingsStore.appSettings, set: (v) => { appSettingsStore.setAppSettings(v) } })
+    const suggestionsVisibleColumns = computed({
+        get: () => appSettingsStore.appSettings.suggestionsVisibleColumns,
+        set: (v) => { appSettingsStore.setSuggestionsVisibleColumns(v) }
     })
-
-    // Computed: Average weight over last 7 days (or fewer if not enough data)
-    const averageWeight = computed(() => {
-        if (logs.value.length === 0) return startWeight.value
-        const sortedLogs = [...logs.value].sort((a, b) => new Date(b.date) - new Date(a.date))
-        const recentLogs = sortedLogs.slice(0, 7).filter(log => log.weight)
-        if (recentLogs.length === 0) return startWeight.value
-        const sum = recentLogs.reduce((acc, log) => acc + log.weight, 0)
-        return sum / recentLogs.length
+    const tdeeManualBias = computed({
+        get: () => appSettingsStore.appSettings.tdeeManualBias,
+        set: (v) => { appSettingsStore.setTdeeManualBias(v) }
     })
-
-
-    // Load from local storage
-    if (localStorage.getItem('tdee_user_store')) {
-        const stored = JSON.parse(localStorage.getItem('tdee_user_store'))
-        if (stored) {
-            startWeight.value = stored.startWeight
-            goalWeight.value = stored.goalWeight
-            height.value = stored.height
-            weeklyRate.value = stored.weeklyRate
-            logs.value = stored.logs || []
-            baselineTDEE.value = stored.baselineTDEE
-                || stored.calculatedTDEE
-                || (startWeight.value ? estimateInitialTDEE(startWeight.value) : null)
-            foodDiaryEnabled.value = Boolean(stored.foodDiaryEnabled)
-            diarySections.value = Array.isArray(stored.diarySections) && stored.diarySections.length > 0
-                ? stored.diarySections
-                : ['Breakfast', 'Lunch', 'Dinner', 'Snacks']
-            diarySectionPercentages.value = sanitizeSectionPercentages(stored.diarySectionPercentages, diarySections.value)
-            foodDiaryEntries.value = Array.isArray(stored.foodDiaryEntries) ? stored.foodDiaryEntries : []
-            foodSuggestions.value = Array.isArray(stored.foodSuggestions) ? stored.foodSuggestions : []
-            foodSuggestions.value = foodSuggestions.value.map((item) => ({
-                ...item,
-                notes: String(item?.notes || ''),
-                tags: Array.isArray(item?.tags)
-                    ? [...new Set(item.tags.map(tag => String(tag || '').trim()).filter(Boolean))]
-                    : []
-            }))
-            aiMealRecognitionEnabled.value = Boolean(stored.aiMealRecognitionEnabled)
-            openAiApiKey.value = String(stored.openAiApiKey || '')
-        }
-    }
-
-    // Watch and save to local storage
-    if (Object.keys(diarySectionPercentages.value).length === 0) {
-        diarySectionPercentages.value = defaultSectionPercentages(diarySections.value)
-    }
-
-    watch([startWeight, goalWeight, height, weeklyRate, logs, foodDiaryEnabled, diarySections, diarySectionPercentages, foodDiaryEntries, foodSuggestions, aiMealRecognitionEnabled, openAiApiKey, baselineTDEE], () => {
-        localStorage.setItem('tdee_user_store', JSON.stringify({
-            startWeight: startWeight.value,
-            goalWeight: goalWeight.value,
-            height: height.value,
-            weeklyRate: weeklyRate.value,
-            logs: logs.value,
-            baselineTDEE: baselineTDEE.value,
-            foodDiaryEnabled: foodDiaryEnabled.value,
-            diarySections: diarySections.value,
-            diarySectionPercentages: diarySectionPercentages.value,
-            foodDiaryEntries: foodDiaryEntries.value,
-            foodSuggestions: foodSuggestions.value,
-            aiMealRecognitionEnabled: aiMealRecognitionEnabled.value,
-            openAiApiKey: openAiApiKey.value
-        }))
-    }, { deep: true })
-
-    watch([startWeight, logs], () => {
-        baselineTDEE.value = startWeight.value ? estimateInitialTDEE(startWeight.value) : estimateInitialTDEE(70)
-        updateTDEE()
-    }, { deep: true, immediate: true })
-
-    // Actions
-    function addLog(date, weight, calories) {
-        const index = logs.value.findIndex(l => l.date === date)
-        if (index !== -1) {
-            logs.value[index] = { date, weight, calories }
-        } else {
-            logs.value.push({ date, weight, calories })
-            // Sort logs by date
-            logs.value.sort((a, b) => new Date(a.date) - new Date(b.date))
-        }
-        // Update current weight if it's the latest entry
-        // No need to manually update currentWeight as it is now a computed property
-        updateTDEE()
-    }
-
-    function updateTDEE() {
-        const result = calculateAdaptiveTDEE(logs.value, baselineTDEE.value)
-        calculatedTDEE.value = result.tdee
-        tdeeDetails.value = result
-    }
-
-    function deleteLog(date) {
-        const index = logs.value.findIndex(l => l.date === date)
-        if (index !== -1) {
-            logs.value.splice(index, 1)
-            updateTDEE()
-        }
-    }
+    const startupActivityEnabled = computed({
+        get: () => appSettingsStore.appSettings.startupActivityEnabled,
+        set: (v) => { appSettingsStore.setStartupActivityEnabled(v) }
+    })
+    const startupActivityLevel = computed({
+        get: () => appSettingsStore.appSettings.startupActivityLevel,
+        set: (v) => { appSettingsStore.setStartupActivityLevel(v) }
+    })
 
     function resetAll() {
-        startWeight.value = null
-        goalWeight.value = null
-        height.value = null
-        weeklyRate.value = 0.5
-        logs.value = []
-        calculatedTDEE.value = null
-        baselineTDEE.value = null
-        tdeeDetails.value = null
-        foodDiaryEnabled.value = false
-        diarySections.value = ['Breakfast', 'Lunch', 'Dinner', 'Snacks']
-        diarySectionPercentages.value = defaultSectionPercentages(diarySections.value)
-        foodDiaryEntries.value = []
-        foodSuggestions.value = []
-        aiMealRecognitionEnabled.value = false
-        openAiApiKey.value = ''
-        localStorage.removeItem('tdee_user_store')
-    }
-
-    function setFoodDiaryEnabled(enabled) {
-        foodDiaryEnabled.value = Boolean(enabled)
-    }
-
-    function setDiarySections(sections) {
-        const sanitized = sections
-            .map(section => String(section || '').trim())
-            .filter(section => section.length > 0)
-        diarySections.value = sanitized.length > 0 ? [...new Set(sanitized)] : ['Breakfast', 'Lunch', 'Dinner', 'Snacks']
-        diarySectionPercentages.value = sanitizeSectionPercentages(diarySectionPercentages.value, diarySections.value)
-    }
-
-    function setDiarySectionPercentage(sectionKey, percentage) {
-        const key = sectionKey || '__unsectioned__'
-        const validKeys = new Set(['__unsectioned__', ...diarySections.value])
-        if (!validKeys.has(key)) return
-        const parsed = Number(percentage)
-        if (!Number.isFinite(parsed) || parsed < 0) return
-        diarySectionPercentages.value = {
-            ...diarySectionPercentages.value,
-            [key]: parsed
-        }
-    }
-
-    function setAiMealRecognitionEnabled(enabled) {
-        aiMealRecognitionEnabled.value = Boolean(enabled)
-    }
-
-    function setOpenAiApiKey(key) {
-        openAiApiKey.value = String(key || '').trim()
-    }
-
-    function addDiaryEntry(date, entry, options = {}) {
-        const id = `entry_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
-        const syncSuggestion = options.syncSuggestion !== false
-        const normalized = {
-            id,
-            date,
-            name: entry.name,
-            amount: entry.amount || '',
-            calories: Number(entry.calories),
-            section: entry.section || '',
-            usePer100g: Boolean(entry.usePer100g),
-            caloriesPer100g: entry.caloriesPer100g !== null && entry.caloriesPer100g !== undefined
-                ? Number(entry.caloriesPer100g)
-                : null
-        }
-        foodDiaryEntries.value.push(normalized)
-        if (syncSuggestion) {
-            upsertSuggestionFromEntry(normalized)
-        }
-    }
-
-    function updateDiaryEntry(id, updates, options = {}) {
-        const index = foodDiaryEntries.value.findIndex(entry => entry.id === id)
-        if (index === -1) return
-        const syncSuggestion = options.syncSuggestion !== false
-        const updated = {
-            ...foodDiaryEntries.value[index],
-            ...updates,
-            calories: Number(updates.calories ?? foodDiaryEntries.value[index].calories),
-            section: updates.section ?? foodDiaryEntries.value[index].section ?? '',
-            usePer100g: Boolean(updates.usePer100g ?? foodDiaryEntries.value[index].usePer100g),
-            caloriesPer100g: updates.caloriesPer100g !== undefined
-                ? Number(updates.caloriesPer100g)
-                : foodDiaryEntries.value[index].caloriesPer100g
-        }
-        foodDiaryEntries.value[index] = updated
-        if (syncSuggestion) {
-            upsertSuggestionFromEntry(updated)
-        }
-    }
-
-    function deleteDiaryEntry(id) {
-        const index = foodDiaryEntries.value.findIndex(entry => entry.id === id)
-        if (index !== -1) {
-            foodDiaryEntries.value.splice(index, 1)
-        }
-    }
-
-    function getDiaryEntriesByDate(date) {
-        return foodDiaryEntries.value
-            .filter(entry => entry.date === date)
-            .sort((a, b) => a.id.localeCompare(b.id))
-    }
-
-    function getDiaryEntriesByDateAndSection(date, section) {
-        return getDiaryEntriesByDate(date)
-            .filter(entry => (entry.section || '') === (section || ''))
-    }
-
-    function sumDiaryCaloriesByDate(date) {
-        return getDiaryEntriesByDate(date).reduce((sum, entry) => sum + (Number(entry.calories) || 0), 0)
-    }
-
-    function sumDiaryCaloriesByDateAndSection(date, section) {
-        return getDiaryEntriesByDateAndSection(date, section).reduce((sum, entry) => sum + (Number(entry.calories) || 0), 0)
-    }
-
-    function upsertSuggestionFromEntry(entry) {
-        const name = String(entry.name || '').trim()
-        const caloriesValue = Number(entry.calories)
-        if (!name || !Number.isFinite(caloriesValue)) return
-        const existing = foodSuggestions.value.find(suggestion => suggestion.name.toLowerCase() === name.toLowerCase())
-        const payload = {
-            name,
-            amount: entry.amount || '',
-            calories: caloriesValue,
-            usePer100g: Boolean(entry.usePer100g),
-            caloriesPer100g: entry.caloriesPer100g !== null && entry.caloriesPer100g !== undefined
-                ? Number(entry.caloriesPer100g)
-                : null,
-            notes: existing?.notes || '',
-            tags: Array.isArray(existing?.tags) ? existing.tags : [],
-            updatedAt: new Date().toISOString()
-        }
-        if (existing) {
-            Object.assign(existing, payload)
-            if (!existing.usage) {
-                existing.usage = { count: 0, lastUsedAt: null }
-            }
-            if (!existing.sectionUsage) {
-                existing.sectionUsage = {}
-            }
-            return
-        }
-        foodSuggestions.value.push({
-            id: `suggestion_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-            usage: { count: 0, lastUsedAt: null },
-            sectionUsage: {},
-            ...payload
-        })
-    }
-
-    function addSuggestion(suggestion) {
-        const name = String(suggestion.name || '').trim()
-        const caloriesValue = Number(suggestion.calories)
-        if (!name || !Number.isFinite(caloriesValue)) return
-        foodSuggestions.value.push({
-            id: `suggestion_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-            name,
-            amount: suggestion.amount || '',
-            calories: caloriesValue,
-            usePer100g: Boolean(suggestion.usePer100g),
-            caloriesPer100g: suggestion.caloriesPer100g !== null && suggestion.caloriesPer100g !== undefined
-                ? Number(suggestion.caloriesPer100g)
-                : null,
-            notes: String(suggestion.notes || ''),
-            tags: Array.isArray(suggestion.tags)
-                ? [...new Set(suggestion.tags.map(tag => String(tag || '').trim()).filter(Boolean))]
-                : [],
-            updatedAt: new Date().toISOString(),
-            usage: { count: 0, lastUsedAt: null },
-            sectionUsage: {}
-        })
-    }
-
-    function updateSuggestion(id, updates) {
-        const index = foodSuggestions.value.findIndex(suggestion => suggestion.id === id)
-        if (index === -1) return
-        foodSuggestions.value[index] = {
-            ...foodSuggestions.value[index],
-            ...updates,
-            name: String(updates.name ?? foodSuggestions.value[index].name).trim(),
-            calories: Number(updates.calories ?? foodSuggestions.value[index].calories) || 0,
-            usePer100g: Boolean(updates.usePer100g ?? foodSuggestions.value[index].usePer100g),
-            caloriesPer100g: updates.caloriesPer100g !== undefined
-                ? Number(updates.caloriesPer100g)
-                : foodSuggestions.value[index].caloriesPer100g,
-            notes: String(updates.notes ?? foodSuggestions.value[index].notes ?? ''),
-            tags: updates.tags !== undefined
-                ? [...new Set((Array.isArray(updates.tags) ? updates.tags : []).map(tag => String(tag || '').trim()).filter(Boolean))]
-                : (Array.isArray(foodSuggestions.value[index].tags) ? foodSuggestions.value[index].tags : []),
-            updatedAt: new Date().toISOString(),
-            usage: foodSuggestions.value[index].usage || { count: 0, lastUsedAt: null },
-            sectionUsage: foodSuggestions.value[index].sectionUsage || {}
-        }
-    }
-
-    function deleteSuggestion(id) {
-        const index = foodSuggestions.value.findIndex(suggestion => suggestion.id === id)
-        if (index !== -1) {
-            foodSuggestions.value.splice(index, 1)
-        }
-    }
-
-    function trackSuggestionLoad(id, section) {
-        const item = foodSuggestions.value.find(suggestion => suggestion.id === id)
-        if (!item) return
-        const now = new Date().toISOString()
-        if (!item.usage) {
-            item.usage = { count: 0, lastUsedAt: null }
-        }
-        if (!item.sectionUsage) {
-            item.sectionUsage = {}
-        }
-        item.usage.count += 1
-        item.usage.lastUsedAt = now
-
-        const sectionKey = section || '__unsectioned__'
-        const current = item.sectionUsage[sectionKey] || { count: 0, lastUsedAt: null }
-        item.sectionUsage[sectionKey] = {
-            count: current.count + 1,
-            lastUsedAt: now
-        }
-    }
-
-    function buildExportPayload(sections = EXPORT_SECTION_KEYS) {
-        const selected = Array.isArray(sections) && sections.length > 0
-            ? sections.filter((key, index, arr) => EXPORT_SECTION_KEYS.includes(key) && arr.indexOf(key) === index)
-            : [...EXPORT_SECTION_KEYS]
-        const payload = {
-            app: 'tdee-mobileapp',
-            schemaVersion: EXPORT_SCHEMA_VERSION,
-            exportedAt: new Date().toISOString(),
-            sections: {}
-        }
-        if (selected.includes('profile')) {
-            payload.sections.profile = {
-                startWeight: startWeight.value,
-                goalWeight: goalWeight.value,
-                height: height.value,
-                weeklyRate: weeklyRate.value,
-                baselineTDEE: baselineTDEE.value,
-                aiMealRecognitionEnabled: aiMealRecognitionEnabled.value,
-                openAiApiKey: openAiApiKey.value
-            }
-        }
-        if (selected.includes('logs')) {
-            payload.sections.logs = {
-                logs: Array.isArray(logs.value) ? [...logs.value] : []
-            }
-        }
-        if (selected.includes('foodDiary')) {
-            payload.sections.foodDiary = {
-                foodDiaryEnabled: Boolean(foodDiaryEnabled.value),
-                diarySections: Array.isArray(diarySections.value) ? [...diarySections.value] : ['Breakfast', 'Lunch', 'Dinner', 'Snacks'],
-                diarySectionPercentages: { ...(diarySectionPercentages.value || {}) },
-                foodDiaryEntries: Array.isArray(foodDiaryEntries.value) ? [...foodDiaryEntries.value] : []
-            }
-        }
-        if (selected.includes('foodSuggestions')) {
-            payload.sections.foodSuggestions = {
-                foodSuggestions: Array.isArray(foodSuggestions.value) ? [...foodSuggestions.value] : []
-            }
-        }
-        return payload
-    }
-
-    function importFromPayload(payload, sections = EXPORT_SECTION_KEYS) {
-        if (!payload || typeof payload !== 'object') return { importedSections: [] }
-        const sourceSections = payload.sections && typeof payload.sections === 'object' ? payload.sections : payload
-        const selected = Array.isArray(sections) && sections.length > 0
-            ? sections.filter((key, index, arr) => EXPORT_SECTION_KEYS.includes(key) && arr.indexOf(key) === index)
-            : [...EXPORT_SECTION_KEYS]
-        const importedSections = []
-
-        if (selected.includes('profile') && sourceSections.profile && typeof sourceSections.profile === 'object') {
-            startWeight.value = sourceSections.profile.startWeight ?? null
-            goalWeight.value = sourceSections.profile.goalWeight ?? null
-            height.value = sourceSections.profile.height ?? null
-            weeklyRate.value = sourceSections.profile.weeklyRate ?? 0.5
-            baselineTDEE.value = sourceSections.profile.baselineTDEE
-                ?? sourceSections.profile.calculatedTDEE
-                ?? (startWeight.value ? estimateInitialTDEE(startWeight.value) : estimateInitialTDEE(70))
-            aiMealRecognitionEnabled.value = Boolean(sourceSections.profile.aiMealRecognitionEnabled)
-            openAiApiKey.value = String(sourceSections.profile.openAiApiKey || '')
-            importedSections.push('profile')
-        }
-
-        if (selected.includes('logs') && sourceSections.logs && typeof sourceSections.logs === 'object') {
-            logs.value = Array.isArray(sourceSections.logs.logs) ? [...sourceSections.logs.logs] : []
-            importedSections.push('logs')
-        }
-
-        if (selected.includes('foodDiary') && sourceSections.foodDiary && typeof sourceSections.foodDiary === 'object') {
-            foodDiaryEnabled.value = Boolean(sourceSections.foodDiary.foodDiaryEnabled)
-            diarySections.value = Array.isArray(sourceSections.foodDiary.diarySections) && sourceSections.foodDiary.diarySections.length > 0
-                ? [...new Set(sourceSections.foodDiary.diarySections.map(section => String(section || '').trim()).filter(Boolean))]
-                : ['Breakfast', 'Lunch', 'Dinner', 'Snacks']
-            diarySectionPercentages.value = sanitizeSectionPercentages(sourceSections.foodDiary.diarySectionPercentages, diarySections.value)
-            foodDiaryEntries.value = Array.isArray(sourceSections.foodDiary.foodDiaryEntries) ? [...sourceSections.foodDiary.foodDiaryEntries] : []
-            importedSections.push('foodDiary')
-        }
-
-        if (selected.includes('foodSuggestions') && sourceSections.foodSuggestions && typeof sourceSections.foodSuggestions === 'object') {
-            foodSuggestions.value = Array.isArray(sourceSections.foodSuggestions.foodSuggestions)
-                ? sourceSections.foodSuggestions.foodSuggestions.map((item) => ({
-                    ...item,
-                    notes: String(item?.notes || ''),
-                    tags: Array.isArray(item?.tags)
-                        ? [...new Set(item.tags.map(tag => String(tag || '').trim()).filter(Boolean))]
-                        : [],
-                    usage: item?.usage || { count: 0, lastUsedAt: null },
-                    sectionUsage: item?.sectionUsage || {}
-                }))
-                : []
-            importedSections.push('foodSuggestions')
-        }
-
-        if (importedSections.includes('logs') && !importedSections.includes('profile')) {
-            baselineTDEE.value = startWeight.value ? estimateInitialTDEE(startWeight.value) : estimateInitialTDEE(70)
-        }
-        updateTDEE()
-
-        return { importedSections }
+        profileStore.resetProfileLogsTdee()
+        diaryStore.resetDiary()
+        suggestionsStore.resetSuggestions()
+        aiStore.resetAiSettings()
+        appSettingsStore.resetAppSettings()
+        localStorage.removeItem(LEGACY_STORAGE_KEY)
     }
 
     return {
@@ -497,40 +137,59 @@ export const useUserStore = defineStore('user', () => {
         averageWeight,
         goalWeight,
         height,
+        age,
+        sex,
         weeklyRate,
         logs,
         baselineTDEE,
+        tdeeSnapshotsByDate,
         calculatedTDEE,
         tdeeDetails,
         foodDiaryEnabled,
         diarySections,
         diarySectionPercentages,
         foodDiaryEntries,
+        diaryClosedSectionsByDate,
+        diaryBudgetSnapshotsByDate,
         foodSuggestions,
         aiMealRecognitionEnabled,
         openAiApiKey,
-        addLog,
-        deleteLog,
-        updateTDEE,
+        appSettings,
+        suggestionsVisibleColumns,
+        tdeeManualBias,
+        startupActivityEnabled,
+        startupActivityLevel,
+        addLog: profileStore.addLog,
+        deleteLog: profileStore.deleteLog,
+        updateTDEE: profileStore.updateTDEE,
         resetAll,
-        setFoodDiaryEnabled,
-        setDiarySections,
-        setDiarySectionPercentage,
-        setAiMealRecognitionEnabled,
-        setOpenAiApiKey,
-        addDiaryEntry,
-        updateDiaryEntry,
-        deleteDiaryEntry,
-        getDiaryEntriesByDate,
-        getDiaryEntriesByDateAndSection,
-        sumDiaryCaloriesByDate,
-        sumDiaryCaloriesByDateAndSection,
-        addSuggestion,
-        updateSuggestion,
-        deleteSuggestion,
-        trackSuggestionLoad,
-        buildExportPayload,
-        importFromPayload,
-        exportSectionKeys: EXPORT_SECTION_KEYS
+        setFoodDiaryEnabled: diaryStore.setFoodDiaryEnabled,
+        setDiarySections: diaryStore.setDiarySections,
+        setDiarySectionPercentage: diaryStore.setDiarySectionPercentage,
+        setDiaryClosedSectionsForDate: diaryStore.setDiaryClosedSectionsForDate,
+        toggleDiarySectionClosedForDate: diaryStore.toggleDiarySectionClosedForDate,
+        upsertDiaryBudgetSnapshot: diaryStore.upsertDiaryBudgetSnapshot,
+        setAiMealRecognitionEnabled: aiStore.setAiMealRecognitionEnabled,
+        setOpenAiApiKey: aiStore.setOpenAiApiKey,
+        setAppSettings: appSettingsStore.setAppSettings,
+        setSuggestionsVisibleColumns: appSettingsStore.setSuggestionsVisibleColumns,
+        setTdeeManualBias: appSettingsStore.setTdeeManualBias,
+        setStartupActivityEnabled: appSettingsStore.setStartupActivityEnabled,
+        setStartupActivityLevel: appSettingsStore.setStartupActivityLevel,
+        addDiaryEntry: diaryStore.addDiaryEntry,
+        updateDiaryEntry: diaryStore.updateDiaryEntry,
+        deleteDiaryEntry: diaryStore.deleteDiaryEntry,
+        getDiaryEntriesByDate: diaryStore.getDiaryEntriesByDate,
+        getDiaryEntriesByDateAndSection: diaryStore.getDiaryEntriesByDateAndSection,
+        getDiarySectionsForDate: diaryStore.getDiarySectionsForDate,
+        sumDiaryCaloriesByDate: diaryStore.sumDiaryCaloriesByDate,
+        sumDiaryCaloriesByDateAndSection: diaryStore.sumDiaryCaloriesByDateAndSection,
+        addSuggestion: suggestionsStore.addSuggestion,
+        updateSuggestion: suggestionsStore.updateSuggestion,
+        deleteSuggestion: suggestionsStore.deleteSuggestion,
+        trackSuggestionLoad: suggestionsStore.trackSuggestionLoad,
+        buildExportPayload: dataTransferStore.buildExportPayload,
+        importFromPayload: dataTransferStore.importFromPayload,
+        exportSectionKeys: dataTransferStore.exportSectionKeys
     }
 })

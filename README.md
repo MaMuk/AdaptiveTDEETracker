@@ -9,6 +9,7 @@ The Adaptive TDEE Tracker is a Vue 3-based mobile application that implements an
 **Key Features:**
 - **Daily Tracking**: Log your weight and calorie intake each day
 - **Adaptive TDEE Calculation**: Automatically calculates your TDEE based on your actual data
+- **Startup Activity Helper (Optional)**: Temporarily guides early recommendations with an activity-based baseline while log history is still short
 - **Goal-Oriented Recommendations**: Get personalized calorie targets to reach your goal weight
 - **Weight Trend Analysis**: View statistics and trends over time
 - **Optional Food Diary**: Keep per-day meal rows by section
@@ -49,6 +50,9 @@ The Adaptive TDEE Tracker is a Vue 3-based mobile application that implements an
    - Enable **Food Diary** in Settings (disabled by default)
    - Open the Diary screen from Tracker summary
    - Add/edit inline rows per section (`Breakfast`, `Lunch`, `Dinner`, `Snacks`, or unsectioned)
+   - Sections can be closed per day; closed sections keep consumed calories as fixed and the remaining budget is redistributed across still-open sections
+   - Daily diary budget snapshots are stored (TDEE/rate/total budget/section percentages) so historical days keep their original targets even after later settings changes
+   - Legacy section names from older entries are preserved for historical display and import compatibility
    - Each row supports:
      - Name
      - Amount
@@ -144,6 +148,21 @@ The Suggestions screen uses a table-based editor for reusable foods.
 - **Be Patient**: The TDEE calculation becomes more accurate as you accumulate more data
 - **Track Honestly**: Accurate calorie logging leads to accurate recommendations
 
+## TDEE Model Behavior
+
+The app uses a trend-based logged maintenance model with optional manual blending:
+
+- **Log-based maintenance (default)**:
+  - Uses complete daily logs (weight + calories) to estimate maintenance from average intake and weight-change slope.
+  - Weekly maintenance values are smoothed across recent weeks.
+  - With no usable logs, the app falls back to a start-weight-based estimate.
+- **Optional activity-based blending (manual)**:
+  - In Settings, you can enable activity-based maintenance (`very low` to `very high`) derived from Mifflin-St Jeor + activity multiplier.
+  - You control the blend explicitly with **Startup blend** (`0..1`):
+    - `0` = log-based only
+    - `1` = activity-based only
+  - There is no automatic observation ramp, startup cap, or automatic fade-out weighting.
+
 ## Build Instructions
 
 ### Prerequisites
@@ -176,16 +195,24 @@ The app will be available at `http://localhost:5173`
 npm run build
 ```
 
-#### Run TDEE Logic Test
+#### Run Tests
+
 ```bash
 npm run test:tdee
+npm run test:ai-meal-recognition
 ```
 
-What this test currently covers:
-- Early first-week water-loss spike protection (baseline-dominant startup behavior)
-- Adaptation ramp over multi-week consistent logging
+What these tests currently cover:
+- `test:tdee`
+- Logged maintenance calculations from weekly weight/calorie trends
+- Weekly smoothing behavior across tracked weeks
 - Long-gap epoch reset behavior
 - Deterministic output for the same final log dataset
+- `test:ai-meal-recognition`
+- OpenAI request includes structured JSON schema response format
+- Provider fallback path can parse sanitized JSON text output
+- Malformed provider text output is rejected with a clear error
+- Structured provider output with unusable guesses is rejected
 
 ### Building Android APK
 
@@ -220,7 +247,28 @@ android.useAndroidX=true
 android.enableJetifier=true
 ```
 
-#### 4. Build the APK
+#### 4. Build the APK (recommended)
+
+Use the project script:
+
+```bash
+npm run build:android
+```
+
+This script does:
+- `npm run build`
+- `npx cap sync android`
+- `cd android && ./gradlew assembleDebug`
+
+Before building, it checks for:
+- `npm` and `npx`
+- `java`
+- Android SDK via `ANDROID_HOME` or `ANDROID_SDK_ROOT` (with `platform-tools/adb`)
+- executable `android/gradlew`
+
+If something is missing, it stops and prints an overview setup checklist.
+
+#### 5. Build the APK (manual equivalent)
 
 ```bash
 # Build web assets
@@ -239,7 +287,7 @@ The APK will be located at:
 android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
-#### 5. Build Release APK (for Production)
+#### 6. Build Release APK (for Production)
 
 First, generate a signing key:
 ```bash

@@ -1,53 +1,45 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import TrackerView from '../views/TrackerView.vue'
-import SettingsView from '../views/SettingsView.vue'
-import StatisticsView from '../views/StatisticsView.vue'
-import DiaryView from '../views/DiaryView.vue'
-import SuggestionsView from '../views/SuggestionsView.vue'
-import DiaryAiRecognitionView from '../views/DiaryAiRecognitionView.vue'
-import SuggestionAiRecognitionView from '../views/SuggestionAiRecognitionView.vue'
-import DataTransferView from '../views/DataTransferView.vue'
 
 const routes = [
     {
         path: '/',
         name: 'Tracker',
-        component: TrackerView
+        component: () => import('../views/TrackerView.vue')
     },
     {
         path: '/settings',
         name: 'Settings',
-        component: SettingsView
+        component: () => import('../views/SettingsView.vue')
     },
     {
         path: '/statistics',
         name: 'Statistics',
-        component: StatisticsView
+        component: () => import('../views/StatisticsView.vue')
     },
     {
         path: '/diary',
         name: 'Diary',
-        component: DiaryView
+        component: () => import('../views/DiaryView.vue')
     },
     {
         path: '/suggestions',
         name: 'Suggestions',
-        component: SuggestionsView
+        component: () => import('../views/SuggestionsView.vue')
     },
     {
         path: '/diary/ai-recognition',
         name: 'DiaryAiRecognition',
-        component: DiaryAiRecognitionView
+        component: () => import('../views/DiaryAiRecognitionView.vue')
     },
     {
         path: '/suggestions/ai-recognition',
         name: 'SuggestionAiRecognition',
-        component: SuggestionAiRecognitionView
+        component: () => import('../views/SuggestionAiRecognitionView.vue')
     },
     {
         path: '/settings/data-transfer',
         name: 'DataTransfer',
-        component: DataTransferView
+        component: () => import('../views/DataTransferView.vue')
     }
 ]
 

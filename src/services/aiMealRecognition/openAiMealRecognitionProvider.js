@@ -1,7 +1,47 @@
-import { AiMealRecognitionProvider } from './aiMealRecognitionProvider'
-import { sanitizeRecognitionResult } from './types'
+import { AiMealRecognitionProvider } from './aiMealRecognitionProvider.js'
+import { sanitizeRecognitionResult } from './types.js'
 
 const OPENAI_PROVIDER = 'openai'
+
+const RECOGNITION_JSON_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['guesses'],
+  properties: {
+    guesses: {
+      type: 'array',
+      maxItems: 4,
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['name', 'calories', 'caloriesPer100g', 'confidence'],
+        properties: {
+          name: { type: 'string' },
+          calories: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['low', 'estimate', 'high'],
+            properties: {
+              low: { type: 'number' },
+              estimate: { type: 'number' },
+              high: { type: 'number' }
+            }
+          },
+          caloriesPer100g: {
+            anyOf: [
+              { type: 'number' },
+              { type: 'null' }
+            ]
+          },
+          confidence: {
+            type: 'string',
+            enum: ['low', 'medium', 'high']
+          }
+        }
+      }
+    }
+  }
+}
 
 export class OpenAiMealRecognitionProvider extends AiMealRecognitionProvider {
   constructor() {
@@ -63,6 +103,14 @@ export class OpenAiMealRecognitionProvider extends AiMealRecognitionProvider {
             ]
           }
         ],
+        text: {
+          format: {
+            type: 'json_schema',
+            name: 'meal_recognition_result',
+            schema: RECOGNITION_JSON_SCHEMA,
+            strict: true
+          }
+        },
         max_output_tokens: 300
       })
     })
@@ -81,18 +129,8 @@ export class OpenAiMealRecognitionProvider extends AiMealRecognitionProvider {
     }
 
     const payload = await response.json()
-    const outputText = extractOutputText(payload)
-
-    if (!outputText) {
-      throw new Error('AI provider returned an empty response.')
-    }
-
-    let parsed
-    try {
-      parsed = parseStructuredJson(outputText)
-    } catch {
-      throw new Error('AI provider response was not valid JSON.')
-    }
+    const structured = extractStructuredOutput(payload)
+    const parsed = structured ?? parseTextOutput(payload)
 
     const sanitized = sanitizeRecognitionResult(parsed, OPENAI_PROVIDER)
     if (sanitized.guesses.length === 0) {
@@ -138,6 +176,41 @@ function buildPrompt(options = {}) {
   }
 
   return base.join(' ')
+}
+
+function extractStructuredOutput(payload) {
+  if (payload?.output_parsed && typeof payload.output_parsed === 'object') {
+    return payload.output_parsed
+  }
+
+  const outputItems = Array.isArray(payload?.output) ? payload.output : []
+  for (const item of outputItems) {
+    const contents = Array.isArray(item?.content) ? item.content : []
+    for (const contentItem of contents) {
+      if (contentItem?.type === 'output_json' && contentItem?.json && typeof contentItem.json === 'object') {
+        return contentItem.json
+      }
+      if (contentItem?.type === 'output_json' && contentItem?.parsed && typeof contentItem.parsed === 'object') {
+        return contentItem.parsed
+      }
+    }
+  }
+
+  return null
+}
+
+function parseTextOutput(payload) {
+  const outputText = extractOutputText(payload)
+
+  if (!outputText) {
+    throw new Error('AI provider returned an empty response.')
+  }
+
+  try {
+    return parseStructuredJson(outputText)
+  } catch {
+    throw new Error('AI provider response was not valid JSON.')
+  }
 }
 
 function extractOutputText(payload) {

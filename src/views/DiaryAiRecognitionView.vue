@@ -1,23 +1,50 @@
 <template>
-  <q-page padding class="diary-ai-page">
+  <q-page
+    padding
+    class="diary-ai-page"
+  >
     <q-card>
       <q-card-section class="row items-center justify-between q-py-sm">
-        <div class="text-h6">AI Meal Recognition (Experimental)</div>
-        <q-btn flat icon="arrow_back" label="Back to Diary" @click="goBack" />
+        <div class="text-h6">
+          AI Meal Recognition (Experimental)
+        </div>
+        <q-btn
+          flat
+          icon="arrow_back"
+          label="Back to Diary"
+          @click="goBack"
+        />
       </q-card-section>
 
       <q-separator />
 
       <q-card-section>
-        <div class="text-caption q-mb-sm">The selected image is sent directly to OpenAI using your configured API key. Image is not stored on this device.</div>
+        <div class="text-caption q-mb-sm">
+          The selected image is sent directly to OpenAI using your configured API key. Image is not stored on this device.
+        </div>
 
-        <q-banner v-if="errorMessage" rounded dense class="bg-red-1 text-negative q-mb-sm">
+        <q-banner
+          v-if="errorMessage"
+          rounded
+          dense
+          class="bg-red-1 text-negative q-mb-sm"
+        >
           {{ errorMessage }}
         </q-banner>
-        <q-banner v-if="warningMessage" rounded dense class="bg-orange-1 text-warning q-mb-sm">
+        <q-banner
+          v-if="warningMessage"
+          rounded
+          dense
+          class="bg-orange-1 text-warning q-mb-sm"
+        >
           {{ warningMessage }}
         </q-banner>
-        <q-banner v-if="demoMessage" rounded dense class="bg-blue-1 text-primary q-mb-sm">
+        <q-banner
+          v-if="demoMessage"
+          rounded
+          dense
+          class="bg-blue-1 text-primary q-mb-sm"
+        >
           {{ demoMessage }}
         </q-banner>
 
@@ -50,17 +77,24 @@
           capture="environment"
           style="display: none"
           @change="onFileInputChange"
-        />
+        >
         <input
           ref="galleryInputRef"
           type="file"
           accept="image/*"
           style="display: none"
           @change="onFileInputChange"
-        />
+        >
 
-        <div v-if="selectedImageDataUrl" class="q-mt-md">
-          <q-img :src="selectedImageDataUrl" fit="contain" style="max-height: 300px; border-radius: 8px;" />
+        <div
+          v-if="selectedImageDataUrl"
+          class="q-mt-md"
+        >
+          <q-img
+            :src="selectedImageDataUrl"
+            fit="contain"
+            style="max-height: 300px; border-radius: 8px;"
+          />
         </div>
 
         <q-input
@@ -74,18 +108,39 @@
         />
 
         <div class="row q-gutter-sm q-mt-md">
-          <q-btn color="primary" label="Analyze Meal" :disable="!selectedImageDataUrl || isRecognizing" :loading="isRecognizing" @click="recognizeMeal" />
-          <q-btn flat label="Clear" :disable="!selectedImageDataUrl || isRecognizing" @click="clearFlow" />
+          <q-btn
+            color="primary"
+            label="Analyze Meal"
+            :disable="!selectedImageDataUrl || isRecognizing"
+            :loading="isRecognizing"
+            @click="recognizeMeal"
+          />
+          <q-btn
+            flat
+            label="Clear"
+            :disable="!selectedImageDataUrl || isRecognizing"
+            @click="clearFlow"
+          />
         </div>
       </q-card-section>
     </q-card>
 
-    <q-card v-if="guesses.length > 0" class="q-mt-md">
+    <q-card
+      v-if="guesses.length > 0"
+      class="q-mt-md"
+    >
       <q-card-section>
-        <div class="text-subtitle1">Review AI Guesses</div>
-        <div class="text-caption q-mb-sm">Select a guess, then edit before saving. You are always the final authority.</div>
+        <div class="text-subtitle1">
+          Review AI Guesses
+        </div>
+        <div class="text-caption q-mb-sm">
+          Select a guess, then edit before saving. You are always the final authority.
+        </div>
 
-        <q-list bordered separator>
+        <q-list
+          bordered
+          separator
+        >
           <q-item
             v-for="(guess, idx) in guesses"
             :key="idx"
@@ -107,9 +162,16 @@
       <q-separator />
 
       <q-card-section v-if="selectedGuess">
-        <q-input v-model="draftName" filled label="Food name" class="q-mb-md" />
+        <q-input
+          v-model="draftName"
+          filled
+          label="Food name"
+          class="q-mb-md"
+        />
 
-        <div class="text-caption q-mb-xs">Estimated calories</div>
+        <div class="text-caption q-mb-xs">
+          Estimated calories
+        </div>
         <q-slider
           v-model="draftCalories"
           :min="0"
@@ -143,7 +205,11 @@
           class="q-mb-sm"
         />
 
-        <q-btn color="positive" label="Save to Diary" @click="saveToDiary" />
+        <q-btn
+          color="positive"
+          label="Save to Diary"
+          @click="saveToDiary"
+        />
       </q-card-section>
     </q-card>
   </q-page>
@@ -153,11 +219,9 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useQuasar } from 'quasar'
-import { Capacitor } from '@capacitor/core'
-import { Camera, CameraResultType, CameraSource } from '@capacitor/camera'
 import { useUserStore } from '../stores/user'
 import { createAiMealRecognitionService } from '../services/aiMealRecognition'
-import { preprocessImageDataUrl } from '../services/aiMealRecognition/imagePreprocessing'
+import { useAiImageAcquisition } from '../composables/useAiImageAcquisition'
 
 const store = useUserStore()
 const route = useRoute()
@@ -165,21 +229,34 @@ const router = useRouter()
 const $q = useQuasar()
 
 const selectedDate = ref(String(route.query.date || new Date().toISOString().split('T')[0]))
-const selectedFile = ref(null)
-const cameraInputRef = ref(null)
-const galleryInputRef = ref(null)
-const selectedImageDataUrl = ref('')
 const guesses = ref([])
 const selectedGuessIndex = ref(0)
 const draftName = ref('')
 const draftCalories = ref(0)
 const draftSection = ref('')
 const isRecognizing = ref(false)
-const isOpeningCamera = ref(false)
 const errorMessage = ref('')
 const warningMessage = ref('')
 const demoMessage = ref('')
 const additionalContext = ref('')
+const {
+  cameraInputRef,
+  galleryInputRef,
+  selectedImageDataUrl,
+  clearTransientImageData,
+  onFileInputChange,
+  openCameraPicker,
+  openGalleryPicker,
+  getPreprocessedSelectedImage
+} = useAiImageAcquisition({
+  isBusy: isRecognizing,
+  onError: (message) => {
+    errorMessage.value = message
+  },
+  onWarning: (message) => {
+    warningMessage.value = message
+  }
+})
 
 const sectionOptions = computed(() => ([
   { label: 'Unsectioned', value: '' },
@@ -217,11 +294,6 @@ onBeforeUnmount(() => {
   clearTransientImageData()
 })
 
-function clearTransientImageData() {
-  selectedFile.value = null
-  selectedImageDataUrl.value = ''
-}
-
 function clearFlow() {
   clearTransientImageData()
   guesses.value = []
@@ -232,108 +304,6 @@ function clearFlow() {
   demoMessage.value = ''
   errorMessage.value = ''
   additionalContext.value = ''
-}
-
-function onImageSelected(file) {
-  errorMessage.value = ''
-  warningMessage.value = ''
-
-  if (!file) {
-    selectedImageDataUrl.value = ''
-    return
-  }
-
-  const reader = new FileReader()
-  reader.onload = () => {
-    selectedImageDataUrl.value = String(reader.result || '')
-  }
-  reader.onerror = () => {
-    errorMessage.value = 'Could not read selected image.'
-  }
-  reader.readAsDataURL(file)
-}
-
-async function openCameraPicker() {
-  if (isOpeningCamera.value || isRecognizing.value) return
-  isOpeningCamera.value = true
-  warningMessage.value = ''
-  try {
-    if (Capacitor.isPluginAvailable('Camera')) {
-      const captured = await tryCaptureWithCapacitorCamera()
-      if (!captured) {
-        warningMessage.value = 'No photo captured.'
-      }
-      return
-    }
-    warningMessage.value = 'Direct camera capture plugin is unavailable. Falling back to browser file picker.'
-    cameraInputRef.value?.click()
-  } catch {
-    warningMessage.value = 'Camera action failed.'
-  } finally {
-    isOpeningCamera.value = false
-  }
-}
-
-function openGalleryPicker() {
-  galleryInputRef.value?.click()
-}
-
-function onFileInputChange(event) {
-  const file = event?.target?.files?.[0] || null
-  onImageSelected(file)
-  if (event?.target) {
-    event.target.value = ''
-  }
-}
-
-async function tryCaptureWithCapacitorCamera() {
-  try {
-    const photo = await Camera.getPhoto({
-      quality: 80,
-      resultType: CameraResultType.DataUrl,
-      source: CameraSource.Camera
-    })
-    const resolvedDataUrl = await resolvePhotoToDataUrl(photo)
-    if (resolvedDataUrl) {
-      onImageSelected(dataUrlToFile(resolvedDataUrl, 'camera-photo.jpg'))
-      return true
-    }
-    return false
-  } catch {
-    return false
-  }
-}
-
-async function resolvePhotoToDataUrl(photo) {
-  if (photo?.dataUrl) return photo.dataUrl
-  if (photo?.base64String) return `data:image/jpeg;base64,${photo.base64String}`
-  if (photo?.webPath) {
-    const response = await fetch(photo.webPath)
-    const blob = await response.blob()
-    return await blobToDataUrl(blob)
-  }
-  return ''
-}
-
-function blobToDataUrl(blob) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(String(reader.result || ''))
-    reader.onerror = () => reject(new Error('Could not read camera image blob.'))
-    reader.readAsDataURL(blob)
-  })
-}
-
-function dataUrlToFile(dataUrl, filename) {
-  const [meta, base64] = String(dataUrl).split(',')
-  const mimeMatch = /data:([^;]+);base64/.exec(meta || '')
-  const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg'
-  const binary = atob(base64 || '')
-  const bytes = new Uint8Array(binary.length)
-  for (let i = 0; i < binary.length; i += 1) {
-    bytes[i] = binary.charCodeAt(i)
-  }
-  return new File([bytes], filename, { type: mimeType })
 }
 
 async function recognizeMeal() {
@@ -354,10 +324,11 @@ async function recognizeMeal() {
 
   isRecognizing.value = true
   try {
-    const preprocessed = await preprocessImageDataUrl(selectedImageDataUrl.value, {
-      maxDimension: 1024,
-      quality: 0.75
-    })
+    const preprocessed = await getPreprocessedSelectedImage({ maxDimension: 1024, quality: 0.75 })
+    if (!preprocessed?.dataUrl) {
+      errorMessage.value = 'Could not preprocess selected image.'
+      return
+    }
 
     const service = createAiMealRecognitionService({ provider: 'openai' })
     const result = await service.recognizeMealFromImage({
