@@ -1,10 +1,12 @@
 import { spawnSync } from 'node:child_process'
-import { accessSync, constants } from 'node:fs'
+import { accessSync, constants, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 
 const projectRoot = process.cwd()
 const androidDir = path.join(projectRoot, 'android')
 const gradlewPath = path.join(androidDir, 'gradlew')
+const packageJsonPath = path.join(projectRoot, 'package.json')
+const androidAppBuildGradlePath = path.join(androidDir, 'app', 'build.gradle')
 
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
@@ -89,11 +91,45 @@ function verifyEnvironment() {
   }
 }
 
+function getAppVersion() {
+  const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8'))
+  const appVersion = String(packageJson.version || '1.0.0').trim()
+  const [majorRaw, minorRaw, patchRaw] = appVersion.split('.')
+  const major = Number.parseInt(majorRaw, 10)
+  const minor = Number.parseInt(minorRaw, 10)
+  const patch = Number.parseInt(patchRaw, 10)
+
+  if ([major, minor, patch].some((part) => Number.isNaN(part))) {
+    throw new Error(`Invalid package.json version "${appVersion}". Expected SemVer major.minor.patch.`)
+  }
+
+  return {
+    appVersion,
+    versionCode: (major * 10000) + (minor * 100) + patch
+  }
+}
+
+function applyAndroidVersioning() {
+  const { appVersion, versionCode } = getAppVersion()
+  const buildGradle = readFileSync(androidAppBuildGradlePath, 'utf8')
+  const nextBuildGradle = buildGradle
+    .replace(/^\s*versionCode\s+.*$/m, `        versionCode ${versionCode}`)
+    .replace(/^\s*versionName\s+.*$/m, `        versionName "${appVersion}"`)
+
+  if (nextBuildGradle !== buildGradle) {
+    writeFileSync(androidAppBuildGradlePath, nextBuildGradle, 'utf8')
+  }
+}
+
 function main() {
+  const isReleaseBuild = process.argv.includes('--release')
+  const gradleTask = isReleaseBuild ? 'assembleRelease' : 'assembleDebug'
+
   verifyEnvironment()
   run('npm', ['run', 'build'])
   run('npx', ['cap', 'sync', 'android'])
-  run('./gradlew', ['assembleDebug'], { cwd: androidDir })
+  applyAndroidVersioning()
+  run('./gradlew', [gradleTask], { cwd: androidDir })
 }
 
 main()

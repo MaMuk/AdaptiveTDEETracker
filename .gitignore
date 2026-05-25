@@ -28,5 +28,12 @@ dist
 .vite
 .cache
 .output
-android/
+android/*
+!android/app/
+android/app/*
+!android/app/build.gradle
 ios/
+
+# Signing secrets
+*.jks
+*.keystore

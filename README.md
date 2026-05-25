@@ -268,7 +268,21 @@ Before building, it checks for:
 
 If something is missing, it stops and prints an overview setup checklist.
 
-#### 5. Build the APK (manual equivalent)
+#### 5. App Versioning Strategy
+
+Android app versioning is derived from `package.json` during `npm run build:android` / `npm run build:android:release`:
+
+- `versionName` = exact `package.json` version (for example `1.4.2`)
+- `versionCode` = numeric SemVer mapping: `major * 10000 + minor * 100 + patch`
+  - Example: `1.4.2` -> `10402`
+
+For every new app release:
+
+1. Update the app version in `package.json` (`major.minor.patch`).
+2. Commit the version change.
+3. Build debug/release APK. The build script updates Android `versionName` and `versionCode` after Capacitor sync.
+
+#### 6. Build the APK (manual equivalent)
 
 ```bash
 # Build web assets
@@ -287,7 +301,7 @@ The APK will be located at:
 android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
-#### 6. Build Release APK (for Production)
+#### 7. Build Release APK (for Production)
 
 First, generate a signing key:
 ```bash
@@ -296,9 +310,33 @@ keytool -genkey -v -keystore my-release-key.keystore -alias my-key-alias -keyalg
 
 Configure signing in `android/app/build.gradle`, then build:
 ```bash
+npm run build:android:release
+
+# manual equivalent:
 cd android
 ./gradlew assembleRelease
 ```
+
+The release APK will be located at:
+```
+android/app/build/outputs/apk/release/app-release.apk
+```
+
+#### 8. Publish Versioned APK on GitHub Releases (manual release is fine)
+
+1. Ensure `package.json` version matches the app version you want to publish.
+2. Build the release APK (`npm run build:android:release`).
+3. Create and push a git tag that matches the version:
+```bash
+git add package.json package-lock.json scripts/build-android.js README.md
+git commit -m "release: v1.2.3"
+git tag v1.2.3
+git push origin main --tags
+```
+4. In GitHub: `Releases` -> `Draft a new release`.
+5. Select tag `v1.2.3`, title it `v1.2.3`, add release notes.
+6. Upload `android/app/build/outputs/apk/release/app-release.apk` as a release asset.
+7. Publish release.
 
 ### Installing on Android Device
 
