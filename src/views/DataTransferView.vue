@@ -227,6 +227,7 @@ function confirmImport() {
       type: 'positive',
       message: `Imported: ${result.importedSections.join(', ')}`
     })
+    router.replace('/welcome')
   })
 }
 </script>

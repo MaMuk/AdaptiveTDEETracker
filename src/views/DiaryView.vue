@@ -66,6 +66,7 @@
         </div>
       </q-card-section>
       <q-card-actions
+        data-tour="diary-actions"
         class="q-pt-none"
         align="between"
       >
@@ -89,6 +90,7 @@
           Overall
         </div>
         <CalorieBudgetBar
+          data-tour="diary-overall"
           :consumed="overallTrackedCalories"
           :target="totalDailyBudget"
           :gain-mode="isGainMode"
@@ -102,6 +104,7 @@
       <div
         v-for="(section, idx) in allSections"
         :key="section.value"
+        :data-tour="idx === 0 ? 'diary-section-first' : null"
         class="section-block"
       >
         <q-separator
@@ -192,6 +195,7 @@
           <div class="row items-center justify-between no-wrap">
             <div class="row no-wrap">
               <q-btn
+                :data-tour="idx === 0 ? 'diary-add-entry' : null"
                 class="btn-muted-green"
                 unelevated
                 dense

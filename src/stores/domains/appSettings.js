@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, watch } from 'vue'
+import { resolveSetupCompleted } from '../../utils/setupCompletion'
 
 const STORAGE_KEY = 'tdee_app_settings_store'
 const ACTIVITY_LEVELS = ['very_low', 'low', 'moderate', 'high', 'very_high']
@@ -36,13 +37,19 @@ function sanitizeAppSettings(value) {
     const startupActivityLevel = ACTIVITY_LEVELS.includes(source.startupActivityLevel)
         ? source.startupActivityLevel
         : 'low'
+    const setupCompleted = resolveSetupCompleted(source)
+    const guidedTourCompleted = Boolean(source.guidedTourCompleted)
+    const disclaimerAccepted = Boolean(source.disclaimerAccepted)
     return {
         suggestionsVisibleColumns: sanitizeSuggestionsVisibleColumns(source.suggestionsVisibleColumns),
         tdeeManualBias: Number.isFinite(tdeeManualBias)
             ? Math.max(0, Math.min(1, Math.round(tdeeManualBias * 100) / 100))
             : 0,
         startupActivityEnabled,
-        startupActivityLevel
+        startupActivityLevel,
+        setupCompleted,
+        guidedTourCompleted,
+        disclaimerAccepted
     }
 }
 
@@ -85,6 +92,27 @@ export const useAppSettingsStore = defineStore('appSettings', () => {
         }
     }
 
+    function setSetupCompleted(value) {
+        appSettings.value = {
+            ...appSettings.value,
+            setupCompleted: Boolean(value)
+        }
+    }
+
+    function setGuidedTourCompleted(value) {
+        appSettings.value = {
+            ...appSettings.value,
+            guidedTourCompleted: Boolean(value)
+        }
+    }
+
+    function setDisclaimerAccepted(value) {
+        appSettings.value = {
+            ...appSettings.value,
+            disclaimerAccepted: Boolean(value)
+        }
+    }
+
     function resetAppSettings() {
         appSettings.value = sanitizeAppSettings({})
     }
@@ -109,6 +137,9 @@ export const useAppSettingsStore = defineStore('appSettings', () => {
         setTdeeManualBias,
         setStartupActivityEnabled,
         setStartupActivityLevel,
+        setSetupCompleted,
+        setGuidedTourCompleted,
+        setDisclaimerAccepted,
         resetAppSettings
     }
 })

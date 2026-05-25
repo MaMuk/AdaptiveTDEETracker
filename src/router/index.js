@@ -1,6 +1,35 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { readAppSettingsSnapshot, resolveSetupCompleted } from '../utils/setupCompletion'
+
+const APP_SETTINGS_STORAGE_KEY = 'tdee_app_settings_store'
+
+function isSetupCompleted() {
+    const snapshot = readAppSettingsSnapshot()
+    return resolveSetupCompleted(snapshot)
+}
+
+function isDisclaimerAccepted() {
+    try {
+        const raw = localStorage.getItem(APP_SETTINGS_STORAGE_KEY)
+        if (!raw) return false
+        const parsed = JSON.parse(raw)
+        return Boolean(parsed?.disclaimerAccepted)
+    } catch {
+        return false
+    }
+}
 
 const routes = [
+    {
+        path: '/onboarding',
+        name: 'Onboarding',
+        component: () => import('../views/OnboardingView.vue')
+    },
+    {
+        path: '/welcome',
+        name: 'Welcome',
+        component: () => import('../views/WelcomeView.vue')
+    },
     {
         path: '/',
         name: 'Tracker',
@@ -46,6 +75,24 @@ const routes = [
 const router = createRouter({
     history: createWebHistory(),
     routes
+})
+
+router.beforeEach((to) => {
+    const completed = isSetupCompleted()
+    const disclaimerAccepted = isDisclaimerAccepted()
+    if (!completed && to.name !== 'Onboarding' && to.name !== 'DataTransfer') {
+        return { name: 'Onboarding' }
+    }
+    if (completed && to.name === 'Onboarding') {
+        return { name: 'Tracker' }
+    }
+    if (completed && !disclaimerAccepted && to.name !== 'Welcome' && to.name !== 'DataTransfer' && to.name !== 'Onboarding') {
+        return { name: 'Welcome' }
+    }
+    if (completed && disclaimerAccepted && to.name === 'Welcome') {
+        return { name: 'Tracker' }
+    }
+    return true
 })
 
 export default router

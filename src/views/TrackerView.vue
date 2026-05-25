@@ -1,10 +1,14 @@
 <template>
   <q-page padding>
-    <q-card class="bg-accent text-primary q-mb-md">
+    <q-card
+      class="bg-accent text-primary q-mb-md"
+      data-tour="info-overview-card"
+    >
       <q-card-section class="q-pb-sm">
         <div class="row q-col-gutter-sm">
           <div class="col-6">
             <q-card
+              data-tour="current-weight-card"
               flat
               bordered
               class="bg-white"
@@ -44,6 +48,7 @@
 
           <div class="col-6">
             <q-card
+              data-tour="goal-weight-card"
               flat
               bordered
               class="bg-white"
@@ -64,6 +69,7 @@
 
           <div class="col-12">
             <q-card
+              data-tour="goal-calories-card"
               flat
               bordered
               class="bg-white"
@@ -106,7 +112,7 @@
                 >
                   <q-card-section class="q-pa-sm">
                     <div class="text-caption text-weight-medium">
-                      DEV: Recommendation Calculation
+                      DEV: Estimate Calculation
                     </div>
                     <div class="text-caption">
                       Logged maintenance: {{ calculationDebug.loggedMaintenance }}
@@ -124,7 +130,7 @@
                       Goal direction: {{ calculationDebug.goalDirection }}
                     </div>
                     <div class="text-caption">
-                      Final recommendation: {{ calculationDebug.finalRecommendation }}
+                      Final estimate: {{ calculationDebug.finalRecommendation }}
                     </div>
                   </q-card-section>
                 </q-card>
@@ -134,6 +140,7 @@
 
           <div class="col-12">
             <q-card
+              data-tour="last7-card"
               flat
               bordered
               class="bg-white"
@@ -179,6 +186,27 @@
                     </div>
                   </div>
                 </div>
+                <q-banner
+                  v-if="sevenDayDeltaWarning"
+                  dense
+                  rounded
+                  class="q-mt-sm tracker-delta-warning"
+                  :class="sevenDayDeltaWarning.level === 'strong' ? 'tracker-delta-warning--strong' : 'tracker-delta-warning--mild'"
+                  role="status"
+                >
+                  <template #action>
+                    <q-btn
+                      flat
+                      dense
+                      round
+                      size="sm"
+                      icon="close"
+                      aria-label="Dismiss warning for 7 days"
+                      @click="dismissSevenDayDeltaWarning"
+                    />
+                  </template>
+                  {{ sevenDayDeltaWarning.message }}
+                </q-banner>
               </q-card-section>
             </q-card>
           </div>
@@ -205,6 +233,7 @@
             :title="formatDate(selectedDate)"
           >
             <q-btn
+              data-tour="date-select-btn"
               color="white"
               text-color="primary"
               outline
@@ -232,6 +261,7 @@
           <q-card
             :key="selectedDate"
             class="day-card elevation-4"
+            data-tour="tracking-fields-card"
           >
             <q-inner-loading :showing="isLoading" />
             <q-card-section>
@@ -241,6 +271,7 @@
               <div class="row q-col-gutter-sm">
                 <div class="col-6">
                   <q-input
+                    data-tour="weight-input"
                     v-model.number="currentWeight"
                     type="number"
                     label="Weight (kg)"
@@ -251,6 +282,7 @@
                 </div>
                 <div class="col-6">
                   <q-input
+                    data-tour="calories-input"
                     v-model.number="currentCalories"
                     type="number"
                     label="Calories"
@@ -261,6 +293,7 @@
                 </div>
               </div>
               <q-btn
+                data-tour="save-entry-btn"
                 label="Save Entry"
                 color="primary"
                 class="full-width q-mt-sm"
@@ -414,7 +447,10 @@
       </q-card>
     </QDialog>
 
-    <div class="text-h6 q-mb-sm">
+    <div
+      class="text-h6 q-mb-sm"
+      data-tour="history-section"
+    >
       History
     </div>
     <q-list
@@ -423,8 +459,9 @@
       class="bg-white rounded-borders"
     >
       <q-item
-        v-for="log in displayedLogs"
+        v-for="(log, idx) in displayedLogs"
         :key="log.date"
+        :data-tour="idx === 0 ? 'history-row-first' : null"
       >
         <q-item-section
           clickable
@@ -446,13 +483,14 @@
         </q-item-section>
         <q-item-section side>
           <q-btn
+            :data-tour="idx === 0 ? 'history-delete-first' : null"
             flat
             round
             dense
             icon="delete"
             color="negative"
             aria-label="Delete entry"
-            @click.stop="confirmDelete(log.date)"
+            @click.stop="confirmDelete(log)"
           />
         </q-item-section>
       </q-item>
@@ -471,7 +509,7 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '../stores/user'
 import { date as qDate, useQuasar } from 'quasar'
 import { QDate, QDialog } from 'quasar'
@@ -481,6 +519,7 @@ import { calculateDailyCalorieAdjustment, computeCalorieTarget } from '../utils/
 
 const store = useUserStore()
 const router = useRouter()
+const route = useRoute()
 const $q = useQuasar()
 
 const selectedDate = ref(todayKey())
@@ -498,6 +537,9 @@ const currentWeight = ref(null)
 const currentCalories = ref(null)
 const historyLimit = ref(14)
 const isDiarySummaryCollapsed = ref(true)
+const isTourMockMode = computed(() => route.query.tourMock === '1')
+const SEVEN_DAY_DELTA_WARNING_DISMISS_KEY = 'tdee_tracker_seven_day_delta_warning_dismissed_until'
+const dismissedSevenDayDeltaWarningUntil = ref(0)
 
 const previousDayDate = computed(() => {
   return addDays(selectedDate.value, -1)
@@ -521,9 +563,31 @@ function loadDateData() {
 loadDateData()
 watch(selectedDate, () => loadDateData())
 isDevModeEnabled.value = localStorage.getItem('tdee_dev_mode_enabled') === 'true'
+dismissedSevenDayDeltaWarningUntil.value = Number(localStorage.getItem(SEVEN_DAY_DELTA_WARNING_DISMISS_KEY)) || 0
 
 const allLogs = computed(() => [...store.logs].sort((a, b) => b.date.localeCompare(a.date)))
-const displayedLogs = computed(() => allLogs.value.slice(0, historyLimit.value))
+
+const mockHistoryEntry = computed(() => {
+  const fallbackCalories = Number.isFinite(Number(recommendedCalories.value))
+    ? Number(recommendedCalories.value)
+    : 2200
+  const fallbackWeight = Number.isFinite(Number(store.startWeight))
+    ? Number(store.startWeight)
+    : (Number.isFinite(Number(store.currentWeight)) ? Number(store.currentWeight) : 70)
+  return {
+    date: addDays(todayKey(), -1),
+    weight: Number(fallbackWeight.toFixed(1)),
+    calories: Math.round(fallbackCalories),
+    isTourMock: true
+  }
+})
+
+const displayedLogs = computed(() => {
+  const realLogs = allLogs.value.slice(0, historyLimit.value)
+  if (realLogs.length === 0 && isTourMockMode.value) return [mockHistoryEntry.value]
+  return realLogs
+})
+
 const canLoadMore = computed(() => allLogs.value.length > historyLimit.value)
 
 const dayDiaryEntries = computed(() => store.foodDiaryEntries
@@ -719,6 +783,15 @@ const sevenDayWeightDelta = computed(() => {
   return `${prefix}${change.toFixed(2)} kg`
 })
 
+const sevenDayWeightDeltaKg = computed(() => {
+  if (store.logs.length < 2 || !store.averageWeight || sevenDayBaselineAverageWeight.value === null) return null
+  const latestWeight = store.averageWeight
+  const baselineWeight = sevenDayBaselineAverageWeight.value
+  if (latestWeight === null || latestWeight === undefined || baselineWeight === null || baselineWeight === undefined) return null
+  const change = latestWeight - baselineWeight
+  return Number.isFinite(change) ? change : null
+})
+
 const sevenDayWeightClass = computed(() => {
   if (store.logs.length < 2 || !store.averageWeight || sevenDayBaselineAverageWeight.value === null) return 'text-grey-7'
   const latestWeight = store.averageWeight
@@ -742,6 +815,38 @@ const sevenDayAvgCaloriesRounded = computed(() => {
   const avg = sevenDayAvgCalories.value
   if (avg === 0) return '—'
   return `${roundTo25(avg)} kcal`
+})
+
+const sevenDayDeltaWarning = computed(() => {
+  if (Date.now() < dismissedSevenDayDeltaWarningUntil.value) return null
+
+  const weeklyDelta = Math.abs(Number(sevenDayWeightDeltaKg.value))
+  const bodyWeightCandidate = Number(store.averageWeight)
+  const fallbackStartWeight = Number(store.startWeight)
+  const bodyWeight = Number.isFinite(bodyWeightCandidate) && bodyWeightCandidate > 0
+    ? bodyWeightCandidate
+    : fallbackStartWeight
+  if (!Number.isFinite(weeklyDelta) || !Number.isFinite(bodyWeight) || bodyWeight <= 0) return null
+
+  const ratePercent = (weeklyDelta / bodyWeight) * 100
+  const prettyRate = ratePercent.toFixed(2)
+  const prettyKg = weeklyDelta.toFixed(2)
+
+  if (ratePercent > 1.5) {
+    return {
+      level: 'strong',
+      message: `Your recent weight trend changes body weight very rapidly at about ${prettyRate}% or ${prettyKg} kg per week. This may be unsafe without professional supervision.`
+    }
+  }
+
+  if (ratePercent > 1.0 || weeklyDelta > 0.5) {
+    return {
+      level: 'mild',
+      message: `Your recent weight trend changes body weight rapidly at about ${prettyRate}% or ${prettyKg} kg per week. Consider reviewing this with a qualified health professional.`
+    }
+  }
+
+  return null
 })
 
 function normalizeDateKey(value) {
@@ -786,13 +891,13 @@ const tdeeConfidenceHint = computed(() => {
   const startupAssistEnabled = Boolean(store.startupActivityEnabled)
 
   if (!startupAssistEnabled && trackedDays > 0 && !hasAtLeastThreeWeeks) {
-    return 'Startup activity assist is available in Settings to stabilize recommendations during the first 3 weeks of logs.'
+    return 'Startup activity assist is available in Settings to stabilize estimates during the first 3 weeks of logs.'
   }
   if (startupAssistEnabled && !hasAtLeastThreeWeeks) {
-    return 'Startup activity assist is currently active and blending your recommendation with your profile activity baseline.'
+    return 'Startup activity assist is currently active and blending your estimate with your profile activity baseline.'
   }
   if (startupAssistEnabled && hasAtLeastThreeWeeks) {
-    return 'Startup activity assist is active. You now have at least 3 weeks of log history, so you can disable it in Settings if you prefer log-only recommendations.'
+    return 'Startup activity assist is active. You now have at least 3 weeks of log history, so you can disable it in Settings if you prefer log-only estimates.'
   }
 
   const details = store.tdeeDetails
@@ -851,6 +956,12 @@ function saveLog() {
   store.addLog(selectedDate.value, currentWeight.value, currentCalories.value)
 }
 
+function dismissSevenDayDeltaWarning() {
+  const dismissUntil = Date.now() + (7 * 24 * 60 * 60 * 1000)
+  dismissedSevenDayDeltaWarningUntil.value = dismissUntil
+  localStorage.setItem(SEVEN_DAY_DELTA_WARNING_DISMISS_KEY, String(dismissUntil))
+}
+
 function openDiaryForSection(section) {
   router.push({ path: '/diary', query: { date: selectedDate.value, section: section || '' } })
 }
@@ -886,7 +997,9 @@ function formatDate(dateString) {
   return qDate.formatDate(dateString, 'MMM D, YYYY')
 }
 
-function confirmDelete(date) {
+function confirmDelete(logOrDate) {
+  if (logOrDate && typeof logOrDate === 'object' && logOrDate.isTourMock) return
+  const date = logOrDate && typeof logOrDate === 'object' ? logOrDate.date : logOrDate
   dateToDelete.value = date
   showDeleteDialog.value = true
 }
@@ -950,5 +1063,21 @@ function deleteEntry() {
 .summary-overall-bar {
   width: 220px;
   min-width: 220px;
+}
+
+.tracker-delta-warning {
+  border: 1px solid transparent;
+}
+
+.tracker-delta-warning--mild {
+  background: #fff8db;
+  border-color: #e3bd44;
+  color: #5e4200;
+}
+
+.tracker-delta-warning--strong {
+  background: #ffe6e6;
+  border-color: #d93f3f;
+  color: #7f1d1d;
 }
 </style>

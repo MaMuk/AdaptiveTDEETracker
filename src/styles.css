@@ -9,3 +9,46 @@
 .diary-ai-page {
   padding-top: 8px;
 }
+
+/* Keep more UI context visible during tour. */
+.driver-overlay {
+  opacity: 0.3 !important;
+}
+
+.driver-popover-footer {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.driver-popover-footer .driver-popover-btn,
+.tour-skip-next-btn {
+  appearance: none;
+  border: 1px solid #c7c7c7;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #2f2f2f;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.1;
+  padding: 6px 10px;
+  min-height: 36px;
+  min-width: 44px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tour-skip-next-btn {
+  border-color: #8f8f8f;
+  background: #f2f2f2;
+  color: #1f1f1f;
+  margin-right: auto;
+}
+
+.driver-popover-footer .driver-popover-btn:hover,
+.tour-skip-next-btn:hover {
+  background: #f7f7f7;
+}

@@ -121,6 +121,18 @@ export const useUserStore = defineStore('user', () => {
         get: () => appSettingsStore.appSettings.startupActivityLevel,
         set: (v) => { appSettingsStore.setStartupActivityLevel(v) }
     })
+    const setupCompleted = computed({
+        get: () => appSettingsStore.appSettings.setupCompleted,
+        set: (v) => { appSettingsStore.setSetupCompleted(v) }
+    })
+    const guidedTourCompleted = computed({
+        get: () => appSettingsStore.appSettings.guidedTourCompleted,
+        set: (v) => { appSettingsStore.setGuidedTourCompleted(v) }
+    })
+    const disclaimerAccepted = computed({
+        get: () => appSettingsStore.appSettings.disclaimerAccepted,
+        set: (v) => { appSettingsStore.setDisclaimerAccepted(v) }
+    })
 
     function resetAll() {
         profileStore.resetProfileLogsTdee()
@@ -159,6 +171,9 @@ export const useUserStore = defineStore('user', () => {
         tdeeManualBias,
         startupActivityEnabled,
         startupActivityLevel,
+        setupCompleted,
+        guidedTourCompleted,
+        disclaimerAccepted,
         addLog: profileStore.addLog,
         deleteLog: profileStore.deleteLog,
         updateTDEE: profileStore.updateTDEE,
@@ -176,6 +191,9 @@ export const useUserStore = defineStore('user', () => {
         setTdeeManualBias: appSettingsStore.setTdeeManualBias,
         setStartupActivityEnabled: appSettingsStore.setStartupActivityEnabled,
         setStartupActivityLevel: appSettingsStore.setStartupActivityLevel,
+        setSetupCompleted: appSettingsStore.setSetupCompleted,
+        setGuidedTourCompleted: appSettingsStore.setGuidedTourCompleted,
+        setDisclaimerAccepted: appSettingsStore.setDisclaimerAccepted,
         addDiaryEntry: diaryStore.addDiaryEntry,
         updateDiaryEntry: diaryStore.updateDiaryEntry,
         deleteDiaryEntry: diaryStore.deleteDiaryEntry,

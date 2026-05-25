@@ -2,6 +2,7 @@
   <div
     class="calorie-budget-bar"
     :style="{ maxWidth }"
+    @click="toggleLabelMode"
   >
     <q-linear-progress
       :value="progressValue"
@@ -17,7 +18,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 
 const props = defineProps({
   consumed: { type: Number, default: 0 },
@@ -26,6 +27,17 @@ const props = defineProps({
   size: { type: String, default: '16px' },
   gainMode: { type: Boolean, default: false }
 })
+
+const showRemaining = ref(false)
+
+const toggleLabelMode = () => {
+  showRemaining.value = !showRemaining.value
+}
+
+const roundedConsumed = computed(() => Math.round(Number(props.consumed) || 0))
+const roundedTarget = computed(() => Math.round(Number(props.target) || 0))
+
+const remainingCalories = computed(() => roundedTarget.value - roundedConsumed.value)
 
 const progressValue = computed(() => {
   const target = Number(props.target)
@@ -45,7 +57,10 @@ const barColor = computed(() => {
   return props.gainMode ? 'green-3' : 'red-3'
 })
 
-const labelText = computed(() => `${Math.round(Number(props.consumed) || 0)}kcal/${Math.round(Number(props.target) || 0)}kcal`)
+const labelText = computed(() => {
+  if (showRemaining.value) return `${remainingCalories.value}kcal`
+  return `${roundedConsumed.value}kcal/${roundedTarget.value}kcal`
+})
 </script>
 
 <style scoped>

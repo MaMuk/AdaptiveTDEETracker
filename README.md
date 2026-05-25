@@ -1,16 +1,16 @@
 # Adaptive TDEE Tracker
 
-A mobile application that helps you track your calories and weight to calculate your Total Daily Energy Expenditure (TDEE) and provides personalized calorie recommendations to reach your target weight or maintain your current weight.
+A mobile application that helps you track your calories and weight to calculate your Total Daily Energy Expenditure (TDEE) and provides personalized calorie estimates to reach your target weight or maintain your current weight.
 
 ## Project Overview
 
-The Adaptive TDEE Tracker is a Vue 3-based mobile application that implements an adaptive TDEE calculation system. It tracks your daily calorie intake and weight changes over time, then uses this data to calculate your actual TDEE and provide accurate calorie recommendations.
+The Adaptive TDEE Tracker is a Vue 3-based mobile application that implements an adaptive TDEE calculation system. It tracks your daily calorie intake and weight changes over time, then uses this data to calculate your actual TDEE and provide accurate calorie estimates.
 
 **Key Features:**
 - **Daily Tracking**: Log your weight and calorie intake each day
 - **Adaptive TDEE Calculation**: Automatically calculates your TDEE based on your actual data
-- **Startup Activity Helper (Optional)**: Temporarily guides early recommendations with an activity-based baseline while log history is still short
-- **Goal-Oriented Recommendations**: Get personalized calorie targets to reach your goal weight
+- **Startup Activity Helper (Optional)**: Temporarily guides early estimates with an activity-based baseline while log history is still short
+- **Goal-Oriented Estimates**: Get personalized calorie targets to reach your goal weight
 - **Weight Trend Analysis**: View statistics and trends over time
 - **Optional Food Diary**: Keep per-day meal rows by section
 - **Suggestions Library**: Reuse common foods with section-aware ranking and search
@@ -38,7 +38,7 @@ The Adaptive TDEE Tracker is a Vue 3-based mobile application that implements an
 2. **Daily Tracking**: Use the Tracker view to:
    - Log your daily weight (weigh yourself at the same time each day for consistency)
    - Record your total calorie intake for the day
-   - View your recommended daily calorie target
+   - View your estimated daily calorie target
    - Optionally review/collapse the per-day diary summary and commit diary calories via **Mark Day Complete**
 
 3. **Monitor Progress**: Check the Statistics view to:
@@ -146,7 +146,7 @@ The Suggestions screen uses a table-based editor for reusable foods.
 - **Consistency is Key**: Log your data daily for the most accurate TDEE calculations
 - **Weigh at the Same Time**: Weight fluctuates throughout the day; weigh yourself at the same time daily (preferably in the morning)
 - **Be Patient**: The TDEE calculation becomes more accurate as you accumulate more data
-- **Track Honestly**: Accurate calorie logging leads to accurate recommendations
+- **Track Honestly**: Accurate calorie logging leads to accurate estimates
 
 ## TDEE Model Behavior
 

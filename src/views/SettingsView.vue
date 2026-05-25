@@ -1,35 +1,29 @@
 <template>
   <q-page padding>
-    <q-card class="q-mb-md">
+    <q-card
+      data-tour="settings-profile"
+      class="q-mb-md"
+    >
       <q-card-section>
         <div class="text-subtitle1">
           Profile
         </div>
-        <q-input
-          v-model.number="localStartWeight"
-          type="number"
-          label="Starting Weight (kg)"
-          filled
-          class="q-mb-sm"
-        />
-        <q-input
-          v-model.number="localGoalWeight"
-          type="number"
-          label="Goal Weight (kg)"
-          filled
-          class="q-mb-sm"
-        />
-        <q-input
-          v-model.number="localHeight"
-          type="number"
-          label="Height (cm)"
-          filled
-          class="q-mb-sm"
+        <ProfileGoalFields
+          :start-weight="localStartWeight"
+          :goal-weight="localGoalWeight"
+          :height="localHeight"
+          :show-rate-fields="false"
+          @update:start-weight="localStartWeight = $event"
+          @update:goal-weight="localGoalWeight = $event"
+          @update:height="localHeight = $event"
         />
       </q-card-section>
     </q-card>
 
-    <q-card class="q-mb-md">
+    <q-card
+      data-tour="settings-startup-assist"
+      class="q-mb-md"
+    >
       <q-card-section>
         <div class="text-subtitle1">
           Goal Rate
@@ -37,140 +31,56 @@
         <div class="text-caption q-mb-sm">
           Weekly weight change target
         </div>
-        
-        <q-select
-          v-model="localWeeklyRate"
-          :options="rateOptions"
-          label="Rate (kg/week)"
-          filled
-          emit-value
-          map-options
+        <ProfileGoalFields
+          :start-weight="localStartWeight"
+          :goal-weight="localGoalWeight"
+          :weekly-rate="localWeeklyRate"
+          :custom-rate="customRate"
+          :body-weight-for-rate="store.averageWeight ?? localStartWeight"
+          :rate-options="rateOptions"
+          :show-profile-fields="false"
+          @update:weekly-rate="localWeeklyRate = $event"
+          @update:custom-rate="customRate = $event"
         />
-
-        <q-input
-          v-if="localWeeklyRate === 'custom'"
-          v-model.number="customRate"
-          type="number"
-          label="Custom Rate (kg/week)"
-          filled
-          class="q-mt-sm"
-          hint="Negative for loss, positive for gain"
-        />
-        <div class="text-caption q-mt-md">
-          Startup activity assist (optional)
-        </div>
-        <q-toggle
-          v-model="localStartupActivityEnabled"
-          label="Use activity-based startup baseline"
-          color="primary"
-          class="q-mt-xs"
-        />
-        <q-select
-          v-if="localStartupActivityEnabled"
-          v-model="localStartupActivityLevel"
-          :options="activityLevelOptions"
-          label="Activity level"
-          filled
-          emit-value
-          map-options
-          class="q-mt-sm"
-        />
-        <q-input
-          v-if="localStartupActivityEnabled"
-          v-model.number="localAge"
-          type="number"
-          label="Age (years)"
-          filled
-          class="q-mt-sm"
-        />
-        <q-select
-          v-if="localStartupActivityEnabled"
-          v-model="localSex"
-          :options="sexOptions"
-          label="Sex"
-          filled
-          emit-value
-          map-options
-          class="q-mt-sm"
-        />
-        <q-banner
-          v-if="localStartupActivityEnabled"
-          rounded
-          class="bg-blue-1 text-primary q-mt-sm"
-        >
-          Uses your profile and activity level to estimate maintenance calories and blends it with your log-based maintenance during startup. Set blend to 0 for log-only or 1 for activity-only.
-        </q-banner>
-        <div
-          v-if="localStartupActivityEnabled"
-          class="text-caption q-mt-md"
-        >
-          Startup blend (0 = log-based only, 1 = activity-based only)
-        </div>
-        <q-slider
-          v-if="localStartupActivityEnabled"
-          v-model="localTdeeManualBias"
-          :min="0"
-          :max="1"
-          :step="0.01"
-          label
-          label-always
-          class="q-mt-sm"
+        <StartupAssistFields
+          class="q-mt-md"
+          :enabled="localStartupActivityEnabled"
+          :activity-level="localStartupActivityLevel"
+          :age="localAge"
+          :sex="localSex"
+          :tdee-manual-bias="localTdeeManualBias"
+          :activity-level-options="activityLevelOptions"
+          :sex-options="sexOptions"
+          @update:enabled="localStartupActivityEnabled = $event"
+          @update:activity-level="localStartupActivityLevel = $event"
+          @update:age="localAge = $event"
+          @update:sex="localSex = $event"
+          @update:tdee-manual-bias="localTdeeManualBias = $event"
         />
       </q-card-section>
     </q-card>
-    <q-card class="q-mb-md">
+    <q-card
+      data-tour="settings-diary"
+      class="q-mb-md"
+    >
       <q-card-section>
         <div class="text-subtitle1">
           Food Diary
         </div>
-        <div class="text-caption q-mb-sm">
-          Optional offline diary that can fill calories into the daily log when you choose.
-        </div>
-        <q-toggle
-          v-model="localFoodDiaryEnabled"
-          label="Enable Food Diary"
-          color="primary"
+        <DiaryFields
+          :enabled="localFoodDiaryEnabled"
+          :sections-text="localDiarySectionsText"
+          :section-percentage-fields="sectionPercentageFields"
+          :section-percentages="localSectionPercentages"
+          :total-section-percentage="totalSectionPercentage"
+          @update:enabled="localFoodDiaryEnabled = $event"
+          @update:sections-text="localDiarySectionsText = $event"
+          @update:section-percentage="onSectionPercentageUpdate"
         />
-        <q-input
-          v-if="localFoodDiaryEnabled"
-          v-model="localDiarySectionsText"
-          type="text"
-          label="Sections (comma separated)"
-          filled
-          class="q-mt-sm"
-          hint="Example: Breakfast, Lunch, Dinner, Snacks"
-        />
-        <div
-          v-if="localFoodDiaryEnabled"
-          class="q-mt-md"
-        >
-          <div class="text-caption q-mb-sm">
-            Section calorie targets (% of daily calories)
-          </div>
-          <div
-            v-for="field in sectionPercentageFields"
-            :key="field.key"
-            class="q-mb-sm"
-          >
-            <q-input
-              v-model.number="localSectionPercentages[field.key]"
-              type="number"
-              min="0"
-              step="1"
-              :label="`${field.label} (%)`"
-              filled
-            />
-          </div>
-          <div
-            class="text-caption"
-            :class="totalSectionPercentage === 100 ? 'text-positive' : 'text-warning'"
-          >
-            Total: {{ totalSectionPercentage }}%
-          </div>
-        </div>
       </q-card-section>
     </q-card>
     <q-card
+      data-tour="settings-ai"
       class="q-mb-md"
       :class="{ 'disabled-card': !localFoodDiaryEnabled }"
     >
@@ -178,31 +88,12 @@
         <div class="text-subtitle1">
           Experimental AI
         </div>
-        <div class="text-caption q-mb-sm">
-          Experimental feature. Meal image is sent directly to OpenAI using your own API key.
-        </div>
-        <div
-          v-if="!localFoodDiaryEnabled"
-          class="text-caption text-grey-7 q-mb-sm"
-        >
-          Enable Food Diary to use this feature.
-        </div>
-        <q-toggle
-          v-model="localAiMealRecognitionEnabled"
-          label="Activate experimental AI recognition"
-          color="primary"
-          :disable="!localFoodDiaryEnabled"
-        />
-        <q-input
-          v-if="localAiMealRecognitionEnabled"
-          v-model="localOpenAiApiKey"
-          type="password"
-          label="OpenAI API key"
-          filled
-          class="q-mt-sm"
-          autocomplete="off"
-          hint="Stored locally on this device."
-          :disable="!localFoodDiaryEnabled"
+        <ExperimentalAiFields
+          :food-diary-enabled="localFoodDiaryEnabled"
+          :ai-enabled="localAiMealRecognitionEnabled"
+          :open-ai-api-key="localOpenAiApiKey"
+          @update:ai-enabled="localAiMealRecognitionEnabled = $event"
+          @update:open-ai-api-key="localOpenAiApiKey = $event"
         />
       </q-card-section>
     </q-card>
@@ -220,6 +111,25 @@
           label="Cancel"
           style="width: 33%;"
           @click="cancelSettings"
+        />
+      </q-card-actions>
+    </q-card>
+    <q-card class="q-mb-md">
+      <q-card-section>
+        <div class="text-subtitle1">
+          Guided Tour
+        </div>
+        <div class="text-caption q-mb-sm">
+          Start the in-app tour from Tracker, then continue through Diary and Settings.
+        </div>
+      </q-card-section>
+      <q-card-actions>
+        <q-btn
+          data-tour="settings-start-tour"
+          color="primary"
+          label="Start Guided Tour"
+          class="full-width"
+          @click="startTour"
         />
       </q-card-actions>
     </q-card>
@@ -402,6 +312,11 @@ import { ref, onMounted, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useQuasar } from 'quasar'
 import { useUserStore } from '../stores/user'
+import { startGuidedProductTour } from '../services/guidedTour'
+import ProfileGoalFields from '../components/setup/ProfileGoalFields.vue'
+import StartupAssistFields from '../components/setup/StartupAssistFields.vue'
+import DiaryFields from '../components/setup/DiaryFields.vue'
+import ExperimentalAiFields from '../components/setup/ExperimentalAiFields.vue'
 
 const router = useRouter()
 const $q = useQuasar()
@@ -695,6 +610,23 @@ async function applyDevScenario(scenario) {
 async function applyDevDiaryScenario(scenario) {
   const mod = await ensureDevScenarioModuleLoaded()
   mod.applyDevDiaryScenario({ scenario, store, notify: notifyDevLoaded })
+}
+
+function onSectionPercentageUpdate({ key, value }) {
+  localSectionPercentages.value = {
+    ...localSectionPercentages.value,
+    [key]: Number(value) || 0
+  }
+}
+
+async function startTour() {
+  await startGuidedProductTour({
+    router,
+    store,
+    onFinish: () => {
+      store.setGuidedTourCompleted(true)
+    }
+  })
 }
 </script>
 

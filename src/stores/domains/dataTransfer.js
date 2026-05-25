@@ -63,8 +63,10 @@ export const useDataTransferStore = defineStore('dataTransfer', () => {
             }
         }
         if (selected.includes('appSettings')) {
+            const sanitized = appSettingsStore.sanitizeAppSettings(appSettingsStore.appSettings)
+            const { disclaimerAccepted, ...exportableAppSettings } = sanitized
             payload.sections.appSettings = {
-                appSettings: appSettingsStore.sanitizeAppSettings(appSettingsStore.appSettings)
+                appSettings: exportableAppSettings
             }
         }
         return payload
@@ -121,11 +123,16 @@ export const useDataTransferStore = defineStore('dataTransfer', () => {
                 ? sourceSections.appSettings.appSettings
                 : sourceSections.appSettings
             appSettingsStore.setAppSettings(incoming)
+            appSettingsStore.setDisclaimerAccepted(false)
             importedSections.push('appSettings')
         }
 
         if (importedSections.includes('logs') && !importedSections.includes('profile') && !Number.isFinite(Number(profileStore.baselineTDEE))) {
             profileStore.baselineTDEE = profileStore.startWeight ? estimateInitialTDEE(profileStore.startWeight) : estimateInitialTDEE(70)
+        }
+        if (importedSections.length > 0) {
+            appSettingsStore.setSetupCompleted(true)
+            appSettingsStore.setDisclaimerAccepted(false)
         }
         profileStore.updateTDEE()
 
