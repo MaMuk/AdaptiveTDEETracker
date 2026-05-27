@@ -264,10 +264,10 @@
     <q-card class="q-mb-md">
       <q-card-section>
         <div class="text-subtitle1">
-          Danger Zone
+          Reset App Data
         </div>
         <div class="text-caption q-mb-sm">
-          Clear all data and start fresh
+          Clears all saved data from this device and restarts the guided setup. Use with care.
         </div>
       </q-card-section>
       <q-card-actions>
@@ -282,7 +282,10 @@
     <q-card class="q-mb-md">
       <q-card-section>
         <div class="text-subtitle1">
-          Attribution
+          Information
+        </div>
+        <div class="text-caption q-mb-sm">
+          Version {{ appVersion }}
         </div>
         <div class="text-caption q-mb-sm">
           Built by
@@ -313,6 +316,7 @@ import { useRouter } from 'vue-router'
 import { useQuasar } from 'quasar'
 import { useUserStore } from '../stores/user'
 import { startGuidedProductTour } from '../services/guidedTour'
+import packageJson from '../../package.json'
 import ProfileGoalFields from '../components/setup/ProfileGoalFields.vue'
 import StartupAssistFields from '../components/setup/StartupAssistFields.vue'
 import DiaryFields from '../components/setup/DiaryFields.vue'
@@ -363,6 +367,7 @@ const devModeEnabled = ref(false)
 const nameTapCount = ref(0)
 const attributionName = 'Martin Melmuk'
 const attributionUrl = 'https://melmuk.at'
+const appVersion = packageJson.version || 'unknown'
 const devScenarioModule = ref(null)
 const devScenarios = ref([])
 const devDiaryScenarios = ref([])
@@ -549,15 +554,15 @@ function cancelSettings() {
 function resetData() {
   $q.dialog({
     title: 'Reset All Data',
-    message: 'Are you sure you want to clear all log entries and user settings? This action cannot be undone.',
+    message: 'This removes all logs and settings from this device and starts the guided setup again. This cannot be undone.',
     persistent: true,
     ok: {
       label: 'Reset',
-      color: 'negative'
+      color: 'warning'
     },
     cancel: {
       label: 'Cancel',
-      color: 'positive'
+      color: 'primary'
     }
   }).onOk(() => {
     store.resetAll()
@@ -579,9 +584,11 @@ function resetData() {
     
     $q.notify({
       type: 'positive',
-      message: 'All data has been reset',
+      message: 'All data removed. Guided setup is ready to start again.',
       position: 'top'
     })
+
+    router.replace('/onboarding')
   })
 }
 

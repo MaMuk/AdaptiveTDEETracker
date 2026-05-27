@@ -36,7 +36,7 @@
               @click="router.push('/settings/data-transfer')"
             />
             <div class="text-caption text-grey-7">
-              Or continue with guided setup.
+              Import a backup, continue with the guided setup, or skip for now and configure everything later in Settings.
             </div>
           </q-step>
 
@@ -121,6 +121,13 @@
                 color="primary"
                 label="Back"
                 @click="step -= 1"
+              />
+              <q-btn
+                v-if="step === 1"
+                flat
+                color="primary"
+                label="Skip Setup"
+                @click="skipSetup"
               />
               <q-space />
               <q-btn
@@ -306,6 +313,13 @@ watch(sectionPercentageFields, fields => {
 function skipStartupAssist() {
   enableStartupAssist.value = false
   finishSetup()
+}
+
+function skipSetup() {
+  store.setSetupCompleted(true)
+  store.setGuidedTourCompleted(false)
+  store.setDisclaimerAccepted(false)
+  router.replace('/welcome')
 }
 
 function onSectionPercentageUpdate({ key, value }) {
