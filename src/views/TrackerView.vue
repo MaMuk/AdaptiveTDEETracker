@@ -271,8 +271,8 @@
               <div class="row q-col-gutter-sm">
                 <div class="col-6">
                   <q-input
-                    data-tour="weight-input"
                     v-model.number="currentWeight"
+                    data-tour="weight-input"
                     type="number"
                     label="Weight (kg)"
                     filled
@@ -282,8 +282,8 @@
                 </div>
                 <div class="col-6">
                   <q-input
-                    data-tour="calories-input"
                     v-model.number="currentCalories"
+                    data-tour="calories-input"
                     type="number"
                     label="Calories"
                     filled
@@ -315,11 +315,11 @@
       >
         <q-card :key="`summary-${selectedDate}`">
           <q-card-section>
-            <div class="row items-center justify-between q-mb-sm">
-              <div class="text-h6">
+            <div class="row items-center justify-between q-mb-sm diary-summary-header">
+              <div class="text-h6 q-mb-xs">
                 Diary Summary
               </div>
-              <div class="row items-center q-gutter-sm summary-overall-bar">
+              <div class="summary-overall-bar">
                 <CalorieBudgetBar
                   :consumed="dayDiaryCalories"
                   :target="totalDailyBudget"
@@ -328,27 +328,39 @@
                   size="18px"
                 />
               </div>
-              <div class="row items-center q-gutter-xs">
-                <q-btn
-                  dense
-                  flat
-                  :icon="isDiarySummaryCollapsed ? 'expand_more' : 'expand_less'"
-                  :label="isDiarySummaryCollapsed ? 'Expand' : 'Collapse'"
-                  @click="isDiarySummaryCollapsed = !isDiarySummaryCollapsed"
-                />
-                <q-btn
-                  dense
-                  flat
-                  icon="open_in_new"
-                  label="Open Diary"
-                  @click="openDiaryForSection('')"
-                />
-              </div>
             </div>
-            <div class="row items-center justify-between q-mb-sm">
+
+            <div class="diary-summary-actions q-mb-sm">
+              <q-btn
+                class="diary-summary-btn"
+                color="primary"
+                unelevated
+                icon="add"
+                label="Add Entry"
+                @click="openTrackerEntryDialog('')"
+              />
+              <q-btn
+                class="diary-summary-btn"
+                outline
+                color="primary"
+                icon="open_in_new"
+                label="Open Diary"
+                @click="openDiaryForSection('')"
+              />
+            </div>
+            <div class="row items-center justify-between q-mb-sm diary-summary-date-row">
               <div class="text-caption">
                 Date: {{ formatDate(selectedDate) }}
               </div>
+              <q-btn
+                dense
+                flat
+                color="primary"
+                class="diary-summary-toggle-btn"
+                :icon="isDiarySummaryCollapsed ? 'expand_more' : 'expand_less'"
+                :label="isDiarySummaryCollapsed ? 'Expand Summary' : 'Collapse Summary'"
+                @click="isDiarySummaryCollapsed = !isDiarySummaryCollapsed"
+              />
             </div>
 
             <div v-if="!isDiarySummaryCollapsed">
@@ -394,11 +406,12 @@
               </div>
             </div>
 
-            <div class="row items-center justify-between q-mt-md">
+            <div class="row items-center justify-between q-gutter-sm q-mt-md diary-summary-footer">
               <div class="text-subtitle1">
                 Diary Total: {{ dayDiaryCalories }} kcal
               </div>
               <q-btn
+                class="diary-summary-complete-btn"
                 color="primary"
                 label="Mark Day Complete"
                 :disable="dayDiaryEntries.length === 0"
@@ -421,6 +434,18 @@
         />
       </q-card-section>
     </QDialog>
+
+    <EntryDialog
+      v-model="showTrackerEntryDialog"
+      :entry="trackerEntryRow"
+      :default-section="trackerEntrySection"
+      :sections="trackerEntrySections"
+      :suggestions="store.foodSuggestions"
+      :measurement-units="store.measurementUnits"
+      :measurement-unit-multipliers="store.measurementUnitMultipliers"
+      @save="saveTrackerEntry"
+      @open-suggestion-picker="openDiaryForSection($event)"
+    />
 
     <QDialog v-model="showDeleteDialog">
       <q-card>
@@ -514,6 +539,7 @@ import { useUserStore } from '../stores/user'
 import { date as qDate, useQuasar } from 'quasar'
 import { QDate, QDialog } from 'quasar'
 import CalorieBudgetBar from '../components/CalorieBudgetBar.vue'
+import EntryDialog from '../components/EntryDialog.vue'
 import { addDays, parseDateKey, todayKey } from '../utils/dateKey'
 import { calculateDailyCalorieAdjustment, computeCalorieTarget } from '../utils/tdee'
 
@@ -532,6 +558,9 @@ const showCalorieBreakdown = ref(false)
 const showCurrentWeightInfo = ref(false)
 const showWeightChangeInfo = ref(false)
 const isDevModeEnabled = ref(false)
+const showTrackerEntryDialog = ref(false)
+const trackerEntryRow = ref(null)
+const trackerEntrySection = ref('')
 
 const currentWeight = ref(null)
 const currentCalories = ref(null)
@@ -633,6 +662,10 @@ const diarySummaryGroups = computed(() => {
 
 const dayDiaryCalories = computed(() => store.sumDiaryCaloriesByDate(selectedDate.value))
 const isGainMode = computed(() => Number(store.weeklyRate) > 0)
+const trackerEntrySections = computed(() => ([
+  { label: 'Unsectioned', value: '' },
+  ...store.getDiarySectionsForDate(selectedDate.value).map(section => ({ label: section, value: section }))
+]))
 
 const totalDailyBudget = computed(() => {
   const snapshot = store.diaryBudgetSnapshotsByDate?.[selectedDate.value]
@@ -966,6 +999,23 @@ function openDiaryForSection(section) {
   router.push({ path: '/diary', query: { date: selectedDate.value, section: section || '' } })
 }
 
+function openTrackerEntryDialog(section = '') {
+  trackerEntryRow.value = null
+  trackerEntrySection.value = section || ''
+  showTrackerEntryDialog.value = true
+}
+
+function saveTrackerEntry(payload) {
+  store.addDiaryEntry(selectedDate.value, {
+    name: String(payload.name || '').trim(),
+    amount: String(payload.amount || '').trim(),
+    calories: Number(payload.calories) || 0,
+    section: payload.section || '',
+    usePer100g: Boolean(payload.usePer100g),
+    caloriesPer100g: payload.usePer100g ? Number(payload.caloriesPer100g) : null
+  }, { syncSuggestion: true })
+}
+
 function commitDiaryToDailyLog() {
   if (dayDiaryEntries.value.length === 0) return
   const totalCalories = dayDiaryCalories.value
@@ -1063,6 +1113,49 @@ function deleteEntry() {
 .summary-overall-bar {
   width: 220px;
   min-width: 220px;
+  justify-self: end;
+}
+
+.diary-summary-header {
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
+.diary-summary-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.diary-summary-btn {
+  min-height: 42px;
+}
+
+.diary-summary-date-row {
+  min-height: 40px;
+}
+
+.diary-summary-toggle-btn {
+  min-height: 32px;
+}
+
+.diary-summary-footer {
+  flex-wrap: wrap;
+}
+
+.diary-summary-complete-btn {
+  min-width: 200px;
+}
+
+@media (max-width: 720px) {
+  .diary-summary-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .diary-summary-complete-btn {
+    width: 100%;
+    min-width: 0;
+  }
 }
 
 .tracker-delta-warning {

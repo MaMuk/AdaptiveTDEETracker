@@ -4,6 +4,11 @@ import { resolveSetupCompleted } from '../../utils/setupCompletion'
 
 const STORAGE_KEY = 'tdee_app_settings_store'
 const ACTIVITY_LEVELS = ['very_low', 'low', 'moderate', 'high', 'very_high']
+const MEASUREMENT_SYSTEMS = ['metric', 'imperial']
+const METRIC_UNITS = ['g', 'ml', 'serving']
+const IMPERIAL_UNITS = ['oz', 'fl oz', 'serving']
+const METRIC_UNIT_MULTIPLIERS = { g: 100, ml: 100, serving: 1 }
+const IMPERIAL_UNIT_MULTIPLIERS = { oz: 100, 'fl oz': 100, serving: 1 }
 
 const DEFAULT_SUGGESTIONS_VISIBLE_COLUMNS = {
     name: true,
@@ -30,6 +35,26 @@ function sanitizeSuggestionsVisibleColumns(value) {
     return result
 }
 
+function sanitizeMeasurementUnits(value, fallback = METRIC_UNITS) {
+    const source = Array.isArray(value) ? value : []
+    const units = [...new Set(source
+        .map(unit => String(unit || '').trim().toLowerCase())
+        .filter(Boolean))]
+    if (units.length === 0) return [...fallback]
+    return units
+}
+
+function sanitizeUnitMultipliers(value, fallbackMap) {
+    const source = value && typeof value === 'object' ? value : {}
+    const out = {}
+    const keys = Object.keys(fallbackMap)
+    for (const key of keys) {
+        const raw = Number(source[key])
+        out[key] = Number.isFinite(raw) && raw > 0 ? raw : fallbackMap[key]
+    }
+    return out
+}
+
 function sanitizeAppSettings(value) {
     const source = value && typeof value === 'object' ? value : {}
     const tdeeManualBias = Number(source.tdeeManualBias)
@@ -40,6 +65,13 @@ function sanitizeAppSettings(value) {
     const setupCompleted = resolveSetupCompleted(source)
     const guidedTourCompleted = Boolean(source.guidedTourCompleted)
     const disclaimerAccepted = Boolean(source.disclaimerAccepted)
+    const measurementSystem = MEASUREMENT_SYSTEMS.includes(source.measurementSystem)
+        ? source.measurementSystem
+        : 'metric'
+    const unitFallback = measurementSystem === 'imperial' ? IMPERIAL_UNITS : METRIC_UNITS
+    const multiplierFallback = measurementSystem === 'imperial' ? IMPERIAL_UNIT_MULTIPLIERS : METRIC_UNIT_MULTIPLIERS
+    const measurementUnits = sanitizeMeasurementUnits(source.measurementUnits, unitFallback)
+    const measurementUnitMultipliers = sanitizeUnitMultipliers(source.measurementUnitMultipliers, multiplierFallback)
     return {
         suggestionsVisibleColumns: sanitizeSuggestionsVisibleColumns(source.suggestionsVisibleColumns),
         tdeeManualBias: Number.isFinite(tdeeManualBias)
@@ -49,7 +81,10 @@ function sanitizeAppSettings(value) {
         startupActivityLevel,
         setupCompleted,
         guidedTourCompleted,
-        disclaimerAccepted
+        disclaimerAccepted,
+        measurementSystem,
+        measurementUnits,
+        measurementUnitMultipliers
     }
 }
 
@@ -113,6 +148,32 @@ export const useAppSettingsStore = defineStore('appSettings', () => {
         }
     }
 
+    function setMeasurementSystem(value) {
+        const nextSystem = MEASUREMENT_SYSTEMS.includes(value) ? value : 'metric'
+        const fallbackUnits = nextSystem === 'imperial' ? IMPERIAL_UNITS : METRIC_UNITS
+        appSettings.value = {
+            ...appSettings.value,
+            measurementSystem: nextSystem,
+            measurementUnits: sanitizeMeasurementUnits(appSettings.value.measurementUnits, fallbackUnits)
+        }
+    }
+
+    function setMeasurementUnits(value) {
+        const fallbackUnits = appSettings.value.measurementSystem === 'imperial' ? IMPERIAL_UNITS : METRIC_UNITS
+        appSettings.value = {
+            ...appSettings.value,
+            measurementUnits: sanitizeMeasurementUnits(value, fallbackUnits)
+        }
+    }
+
+    function setMeasurementUnitMultipliers(value) {
+        const fallbackMap = appSettings.value.measurementSystem === 'imperial' ? IMPERIAL_UNIT_MULTIPLIERS : METRIC_UNIT_MULTIPLIERS
+        appSettings.value = {
+            ...appSettings.value,
+            measurementUnitMultipliers: sanitizeUnitMultipliers(value, fallbackMap)
+        }
+    }
+
     function resetAppSettings() {
         appSettings.value = sanitizeAppSettings({})
     }
@@ -140,6 +201,9 @@ export const useAppSettingsStore = defineStore('appSettings', () => {
         setSetupCompleted,
         setGuidedTourCompleted,
         setDisclaimerAccepted,
+        setMeasurementSystem,
+        setMeasurementUnits,
+        setMeasurementUnitMultipliers,
         resetAppSettings
     }
 })

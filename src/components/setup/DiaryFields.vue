@@ -46,6 +46,40 @@
     >
       Total: {{ totalSectionPercentage }}%
     </div>
+
+    <div class="q-mt-md">
+      <div class="text-caption text-grey-7 q-mb-xs">
+        Measurement system
+      </div>
+      <q-btn-toggle
+        :model-value="measurementSystem"
+        spread
+        unelevated
+        color="grey-3"
+        text-color="dark"
+        toggle-color="primary"
+        :options="measurementSystemOptions"
+        @update:model-value="emit('update:measurementSystem', $event)"
+      />
+    </div>
+
+    <q-input
+      :model-value="measurementUnitsText"
+      class="q-mt-sm"
+      filled
+      label="Measured units (comma separated)"
+      hint="Used for Measured entry mode in Diary and Suggestions."
+      @update:model-value="emit('update:measurementUnitsText', String($event || ''))"
+    />
+
+    <q-input
+      :model-value="measurementMultipliersText"
+      class="q-mt-sm"
+      filled
+      label="Unit multipliers (unit:value)"
+      hint="Example: g:100, ml:100, serving:1"
+      @update:model-value="emit('update:measurementMultipliersText', String($event || ''))"
+    />
   </div>
 </template>
 
@@ -57,13 +91,26 @@ defineProps({
   sectionPercentages: { type: Object, required: true },
   totalSectionPercentage: { type: Number, required: true },
   description: { type: String, default: 'Optional offline diary that can fill calories into the daily log when you choose.' },
-  toggleLabel: { type: String, default: 'Enable Food Diary' }
+  toggleLabel: { type: String, default: 'Enable Food Diary' },
+  measurementSystem: { type: String, default: 'metric' },
+  measurementUnitsText: { type: String, default: 'g, ml, serving' },
+  measurementMultipliersText: { type: String, default: 'g:100, ml:100, serving:1' },
+  measurementSystemOptions: {
+    type: Array,
+    default: () => ([
+      { label: 'Metric', value: 'metric' },
+      { label: 'Imperial', value: 'imperial' }
+    ])
+  }
 })
 
 const emit = defineEmits([
   'update:enabled',
   'update:sectionsText',
-  'update:sectionPercentage'
+  'update:sectionPercentage',
+  'update:measurementSystem',
+  'update:measurementUnitsText',
+  'update:measurementMultipliersText'
 ])
 
 function toNumberOrZero(value) {

@@ -133,6 +133,18 @@ export const useUserStore = defineStore('user', () => {
         get: () => appSettingsStore.appSettings.disclaimerAccepted,
         set: (v) => { appSettingsStore.setDisclaimerAccepted(v) }
     })
+    const measurementSystem = computed({
+        get: () => appSettingsStore.appSettings.measurementSystem,
+        set: (v) => { appSettingsStore.setMeasurementSystem(v) }
+    })
+    const measurementUnits = computed({
+        get: () => appSettingsStore.appSettings.measurementUnits,
+        set: (v) => { appSettingsStore.setMeasurementUnits(v) }
+    })
+    const measurementUnitMultipliers = computed({
+        get: () => appSettingsStore.appSettings.measurementUnitMultipliers,
+        set: (v) => { appSettingsStore.setMeasurementUnitMultipliers(v) }
+    })
 
     function resetAll() {
         profileStore.resetProfileLogsTdee()
@@ -174,6 +186,9 @@ export const useUserStore = defineStore('user', () => {
         setupCompleted,
         guidedTourCompleted,
         disclaimerAccepted,
+        measurementSystem,
+        measurementUnits,
+        measurementUnitMultipliers,
         addLog: profileStore.addLog,
         deleteLog: profileStore.deleteLog,
         updateTDEE: profileStore.updateTDEE,
@@ -194,6 +209,9 @@ export const useUserStore = defineStore('user', () => {
         setSetupCompleted: appSettingsStore.setSetupCompleted,
         setGuidedTourCompleted: appSettingsStore.setGuidedTourCompleted,
         setDisclaimerAccepted: appSettingsStore.setDisclaimerAccepted,
+        setMeasurementSystem: appSettingsStore.setMeasurementSystem,
+        setMeasurementUnits: appSettingsStore.setMeasurementUnits,
+        setMeasurementUnitMultipliers: appSettingsStore.setMeasurementUnitMultipliers,
         addDiaryEntry: diaryStore.addDiaryEntry,
         updateDiaryEntry: diaryStore.updateDiaryEntry,
         deleteDiaryEntry: diaryStore.deleteDiaryEntry,

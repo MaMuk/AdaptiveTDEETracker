@@ -74,9 +74,16 @@
               :section-percentage-fields="sectionPercentageFields"
               :section-percentages="localSectionPercentages"
               :total-section-percentage="totalSectionPercentage"
+              :measurement-system="localMeasurementSystem"
+              :measurement-units-text="localMeasurementUnitsText"
+              :measurement-multipliers-text="localMeasurementMultipliersText"
+              :measurement-system-options="measurementSystemOptions"
               @update:enabled="localFoodDiaryEnabled = $event"
               @update:sections-text="localDiarySectionsText = $event"
               @update:section-percentage="onSectionPercentageUpdate"
+              @update:measurement-system="applyMeasurementPreset"
+              @update:measurement-units-text="localMeasurementUnitsText = $event"
+              @update:measurement-multipliers-text="localMeasurementMultipliersText = $event"
             />
             <ExperimentalAiFields
               class="q-mt-md"
@@ -191,6 +198,9 @@ const localDiarySectionsText = ref('Breakfast, Lunch, Dinner, Snacks')
 const localSectionPercentages = ref({})
 const localAiMealRecognitionEnabled = ref(false)
 const localOpenAiApiKey = ref('')
+const localMeasurementSystem = ref('metric')
+const localMeasurementUnitsText = ref('g, ml, serving')
+const localMeasurementMultipliersText = ref('g:100, ml:100, serving:1')
 
 const rateOptions = [
   { label: '-0.25 kg/week', value: -0.25 },
@@ -213,6 +223,14 @@ const sexOptions = [
   { label: 'Male', value: 'male' },
   { label: 'Female', value: 'female' }
 ]
+const measurementSystemOptions = [
+  { label: 'Metric', value: 'metric' },
+  { label: 'Imperial', value: 'imperial' }
+]
+const METRIC_UNITS = ['g', 'ml', 'serving']
+const IMPERIAL_UNITS = ['oz', 'fl oz', 'serving']
+const METRIC_MULTIPLIERS = { g: 100, ml: 100, serving: 1 }
+const IMPERIAL_MULTIPLIERS = { oz: 100, 'fl oz': 100, serving: 1 }
 
 onMounted(() => {
   const isFreshSetup = !store.setupCompleted
@@ -232,6 +250,13 @@ onMounted(() => {
   localSectionPercentages.value = { ...(store.diarySectionPercentages || {}) }
   localAiMealRecognitionEnabled.value = isFreshSetup ? false : Boolean(store.aiMealRecognitionEnabled)
   localOpenAiApiKey.value = isFreshSetup ? '' : (store.openAiApiKey || '')
+  localMeasurementSystem.value = store.measurementSystem || 'metric'
+  localMeasurementUnitsText.value = (Array.isArray(store.measurementUnits) && store.measurementUnits.length > 0
+    ? store.measurementUnits
+    : (localMeasurementSystem.value === 'imperial' ? IMPERIAL_UNITS : METRIC_UNITS)).join(', ')
+  localMeasurementMultipliersText.value = Object.entries(store.measurementUnitMultipliers || (localMeasurementSystem.value === 'imperial' ? IMPERIAL_MULTIPLIERS : METRIC_MULTIPLIERS))
+    .map(([unit, value]) => `${unit}:${value}`)
+    .join(', ')
 })
 
 const parsedSections = computed(() => {
@@ -329,6 +354,40 @@ function onSectionPercentageUpdate({ key, value }) {
   }
 }
 
+function parseUnits(text, fallbackSystem) {
+  const fallback = fallbackSystem === 'imperial' ? IMPERIAL_UNITS : METRIC_UNITS
+  const units = [...new Set(String(text || '')
+    .split(',')
+    .map(unit => unit.trim().toLowerCase())
+    .filter(Boolean))]
+  return units.length > 0 ? units : [...fallback]
+}
+
+function parseMultipliers(text, units, fallbackSystem) {
+  const fallback = fallbackSystem === 'imperial' ? IMPERIAL_MULTIPLIERS : METRIC_MULTIPLIERS
+  const out = {}
+  for (const unit of units) {
+    out[unit] = Number(fallback[unit]) > 0 ? Number(fallback[unit]) : 1
+  }
+  const parts = String(text || '').split(',')
+  for (const part of parts) {
+    const [rawUnit, rawValue] = String(part).split(':')
+    const unit = String(rawUnit || '').trim().toLowerCase()
+    const value = Number(rawValue)
+    if (!unit || !units.includes(unit) || !Number.isFinite(value) || value <= 0) continue
+    out[unit] = value
+  }
+  return out
+}
+
+function applyMeasurementPreset(system) {
+  localMeasurementSystem.value = system === 'imperial' ? 'imperial' : 'metric'
+  const preset = localMeasurementSystem.value === 'imperial' ? IMPERIAL_UNITS : METRIC_UNITS
+  localMeasurementUnitsText.value = preset.join(', ')
+  const presetMultipliers = localMeasurementSystem.value === 'imperial' ? IMPERIAL_MULTIPLIERS : METRIC_MULTIPLIERS
+  localMeasurementMultipliersText.value = Object.entries(presetMultipliers).map(([unit, value]) => `${unit}:${value}`).join(', ')
+}
+
 function finishSetup() {
   if (!canFinishSetup.value) {
     $q.notify({
@@ -357,6 +416,10 @@ function finishSetup() {
   }
   store.setAiMealRecognitionEnabled(localFoodDiaryEnabled.value ? localAiMealRecognitionEnabled.value : false)
   store.setOpenAiApiKey(localFoodDiaryEnabled.value && localAiMealRecognitionEnabled.value ? localOpenAiApiKey.value : '')
+  store.setMeasurementSystem(localMeasurementSystem.value)
+  const units = parseUnits(localMeasurementUnitsText.value, localMeasurementSystem.value)
+  store.setMeasurementUnits(units)
+  store.setMeasurementUnitMultipliers(parseMultipliers(localMeasurementMultipliersText.value, units, localMeasurementSystem.value))
 
   store.setSetupCompleted(true)
   store.setGuidedTourCompleted(false)

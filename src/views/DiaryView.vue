@@ -221,142 +221,18 @@
       </div>
     </q-card>
 
-    <QDialog
+    <EntryDialog
+      ref="entryDialogRef"
       v-model="showEntryDialog"
-      persistent
-    >
-      <q-card style="min-width: 320px; width: 100%; max-width: 760px;">
-        <q-card-section class="row items-center justify-between">
-          <div class="text-h6">
-            {{ editDraft.id ? 'Edit Entry' : 'New Entry' }}
-          </div>
-          <q-chip
-            dense
-            :color="isDraftDirty ? 'orange-6' : 'positive'"
-            text-color="white"
-            icon="save"
-          >
-            {{ isDraftDirty ? 'Unsaved' : 'Saved' }}
-          </q-chip>
-        </q-card-section>
-
-        <q-card-section class="q-pt-none">
-          <div class="row q-col-gutter-sm">
-            <div class="col-12 col-md-8">
-              <div class="name-field-wrap">
-                <q-input
-                  v-model="editDraft.name"
-                  dense
-                  filled
-                  label="Name"
-                  @update:model-value="onNameInputChanged"
-                  @focus="showNameSuggestions = true"
-                  @blur="onNameFieldBlur"
-                />
-                <q-list
-                  v-if="showNameSuggestions && nameSuggestionMatches.length > 0"
-                  bordered
-                  separator
-                  class="name-suggestion-list"
-                >
-                  <q-item
-                    v-for="option in nameSuggestionMatches"
-                    :key="option.id"
-                    clickable
-                    @mousedown.prevent
-                    @click="chooseNameSuggestion(option)"
-                  >
-                    <q-item-section>
-                      <q-item-label>{{ option.name }}</q-item-label>
-                      <q-item-label caption>
-                        {{ option.amount || 'No amount' }} · {{ option.calories }} kcal
-                      </q-item-label>
-                    </q-item-section>
-                  </q-item>
-                </q-list>
-              </div>
-            </div>
-            <div class="col-12 col-md-4">
-              <q-select
-                v-model="editDraft.section"
-                dense
-                filled
-                emit-value
-                map-options
-                label="Section"
-                :options="allSections.map(s => ({ label: s.label, value: s.value }))"
-              />
-            </div>
-            <div class="col-12 col-md-4">
-              <q-input
-                v-model="editDraft.amount"
-                dense
-                filled
-                label="Amount"
-              />
-            </div>
-            <div class="col-12 col-md-4">
-              <q-input
-                v-model.number="editDraft.calories"
-                dense
-                filled
-                type="number"
-                min="0"
-                step="1"
-                label="kcal"
-                :disable="editDraft.usePer100g"
-              />
-            </div>
-            <div class="col-12 col-md-4">
-              <q-input
-                v-model.number="editDraft.caloriesPer100g"
-                dense
-                filled
-                type="number"
-                min="0"
-                step="1"
-                label="kcal / 100g"
-                :disable="!editDraft.usePer100g"
-              />
-            </div>
-            <div class="col-12">
-              <q-checkbox
-                v-model="editDraft.usePer100g"
-                label="Use 100g mode"
-              />
-              <q-btn
-                dense
-                flat
-                color="dark"
-                icon="history"
-                label="Open Suggestion Picker"
-                @click="openSuggestionPicker(editDraft.section, true)"
-              />
-            </div>
-          </div>
-        </q-card-section>
-
-        <q-card-actions align="right">
-          <q-btn
-            flat
-            label="Revert"
-            :disable="!isDraftDirty"
-            @click="revertDraft"
-          />
-          <q-btn
-            flat
-            label="Cancel"
-            @click="closeEntryDialog"
-          />
-          <q-btn
-            color="primary"
-            unelevated
-            label="Save"
-            @click="saveDraft(true)"
-          />
-        </q-card-actions>
-      </q-card>
-    </QDialog>
+      :entry="activeEntryRow"
+      :default-section="entryDialogSection"
+      :sections="allSections.map(s => ({ label: s.label, value: s.value }))"
+      :suggestions="rankedSuggestions"
+      :measurement-units="store.measurementUnits"
+      :measurement-unit-multipliers="store.measurementUnitMultipliers"
+      @save="saveEntryFromDialog"
+      @open-suggestion-picker="openSuggestionPicker($event, true)"
+    />
 
     <QDialog v-model="showSuggestionPicker">
       <q-card style="min-width: 320px; width: 100%; max-width: 860px;">
@@ -515,6 +391,7 @@ import { date as qDate, useQuasar } from 'quasar'
 import { QDialog, QDate } from 'quasar'
 import { useUserStore } from '../stores/user'
 import CalorieBudgetBar from '../components/CalorieBudgetBar.vue'
+import EntryDialog from '../components/EntryDialog.vue'
 import { addDays, todayKey } from '../utils/dateKey'
 import { computeCalorieTarget } from '../utils/tdee'
 
@@ -539,23 +416,9 @@ const suggestionCalculatedFilterOptions = [
 ]
 const suggestionCalculatedFilter = ref('all')
 const suggestionForEntryDialog = ref(false)
-const showNameSuggestions = ref(false)
-const isDraftDirty = ref(false)
-const lastSavedDraft = ref(defaultDraft())
-
-const editDraft = ref(defaultDraft())
-
-function defaultDraft() {
-  return {
-    id: null,
-    name: '',
-    amount: '',
-    calories: null,
-    section: '',
-    usePer100g: false,
-    caloriesPer100g: null
-  }
-}
+const entryDialogRef = ref(null)
+const activeEntryRow = ref(null)
+const entryDialogSection = ref('')
 
 const allSections = computed(() => ([
   { label: 'Unsectioned', value: '' },
@@ -624,15 +487,6 @@ const allSuggestionTags = computed(() => {
   }
   return [...tags].sort((a, b) => a.localeCompare(b))
 })
-const nameSuggestionMatches = computed(() => {
-  const query = String(editDraft.value.name || '').trim().toLowerCase()
-  return rankedSuggestions.value
-    .filter(item => String(item.name || '').trim().length > 0)
-    .filter(item => !query || String(item.name || '').toLowerCase().includes(query))
-    .filter((item, index, arr) => arr.findIndex(other => String(other.name || '').toLowerCase() === String(item.name || '').toLowerCase()) === index)
-    .slice(0, 8)
-})
-
 const rankedSuggestions = computed(() => {
   const now = Date.now()
   const secKey = suggestionTargetSection.value || '__unsectioned__'
@@ -693,20 +547,6 @@ watch(selectedDate, date => {
   router.replace({ path: '/diary', query: { date } })
   ensureBudgetSnapshot(date)
 })
-
-watch(editDraft, () => {
-  if (showEntryDialog.value) {
-    isDraftDirty.value = true
-  }
-}, { deep: true })
-
-watch(
-  () => [editDraft.value.usePer100g, editDraft.value.amount, editDraft.value.caloriesPer100g],
-  () => {
-    if (!showEntryDialog.value || !editDraft.value.usePer100g) return
-    editDraft.value.calories = calculateCaloriesForDraft()
-  }
-)
 
 function sectionKey(section) {
   return section || '__unsectioned__'
@@ -825,102 +665,27 @@ function ensureBudgetSnapshot(date) {
   })
 }
 
-function calculateCaloriesForDraft() {
-  if (!editDraft.value.usePer100g) return Number(editDraft.value.calories) || 0
-  const grams = Number(editDraft.value.amount)
-  const per100g = Number(editDraft.value.caloriesPer100g)
-  if (!Number.isFinite(grams) || grams < 0 || !Number.isFinite(per100g) || per100g < 0) {
-    return Number(editDraft.value.calories) || 0
-  }
-  return Math.round((grams * per100g) / 100)
-}
-
-function validateDraft(notify = true) {
-  const name = String(editDraft.value.name || '').trim()
-  const calories = Number(calculateCaloriesForDraft())
-  const caloriesPer100g = Number(editDraft.value.caloriesPer100g)
-
-  if (!name) {
-    if (notify) $q.notify({ type: 'negative', message: 'Name is required.' })
-    return false
-  }
-  if (!Number.isFinite(calories) || calories < 0) {
-    if (notify) $q.notify({ type: 'negative', message: 'Calories must be a valid non-negative number.' })
-    return false
-  }
-  if (editDraft.value.usePer100g && (!Number.isFinite(caloriesPer100g) || caloriesPer100g < 0)) {
-    if (notify) $q.notify({ type: 'negative', message: 'Calories per 100g must be valid when 100g mode is enabled.' })
-    return false
-  }
-  return true
-}
-
-function saveDraft(closeAfterSave = false, silent = false) {
-  if (!validateDraft(!silent)) return
-  const payload = {
-    name: String(editDraft.value.name || '').trim(),
-    amount: String(editDraft.value.amount || '').trim(),
-    calories: Math.round(calculateCaloriesForDraft()),
-    section: editDraft.value.section || '',
-    usePer100g: Boolean(editDraft.value.usePer100g),
-    caloriesPer100g: editDraft.value.usePer100g ? Number(editDraft.value.caloriesPer100g) : null
-  }
-
-  if (editDraft.value.id) {
-    store.updateDiaryEntry(editDraft.value.id, payload, { syncSuggestion: true })
-  } else {
-    store.addDiaryEntry(selectedDate.value, payload, { syncSuggestion: true })
-    const created = store.getDiaryEntriesByDateAndSection(selectedDate.value, payload.section).slice(-1)[0]
-    editDraft.value.id = created?.id || null
-  }
-
-  lastSavedDraft.value = {
-    ...editDraft.value,
-    ...payload
-  }
-  isDraftDirty.value = false
-  if (closeAfterSave) {
-    showEntryDialog.value = false
-  }
-}
-
 function openEntryDialog({ section, row = null }) {
-  if (row) {
-    editDraft.value = {
-      id: row.id,
-      name: row.name || '',
-      amount: row.amount || '',
-      calories: Number(row.calories) || 0,
-      section: row.section || section || '',
-      usePer100g: Boolean(row.usePer100g),
-      caloriesPer100g: row.caloriesPer100g ?? null
-    }
-  } else {
-    editDraft.value = {
-      ...defaultDraft(),
-      section: section || ''
-    }
-  }
-  lastSavedDraft.value = { ...editDraft.value }
-  showNameSuggestions.value = false
-  isDraftDirty.value = false
+  activeEntryRow.value = row ? { ...row } : null
+  entryDialogSection.value = section || ''
   showEntryDialog.value = true
 }
 
-function closeEntryDialog() {
-  showEntryDialog.value = false
-  editDraft.value = defaultDraft()
-  showNameSuggestions.value = false
-  lastSavedDraft.value = defaultDraft()
-  isDraftDirty.value = false
-}
-
-function revertDraft() {
-  if (!lastSavedDraft.value.id && editDraft.value.id) {
-    store.deleteDiaryEntry(editDraft.value.id)
+function saveEntryFromDialog(payload) {
+  const normalizedPayload = {
+    name: String(payload.name || '').trim(),
+    amount: String(payload.amount || '').trim(),
+    calories: Number(payload.calories) || 0,
+    section: payload.section || '',
+    usePer100g: Boolean(payload.usePer100g),
+    caloriesPer100g: payload.usePer100g ? Number(payload.caloriesPer100g) : null
   }
-  editDraft.value = { ...lastSavedDraft.value }
-  isDraftDirty.value = false
+
+  if (payload.id) {
+    store.updateDiaryEntry(payload.id, normalizedPayload, { syncSuggestion: true })
+  } else {
+    store.addDiaryEntry(selectedDate.value, normalizedPayload, { syncSuggestion: true })
+  }
 }
 
 function confirmDeleteRow(row) {
@@ -932,29 +697,6 @@ function confirmDeleteRow(row) {
   }).onOk(() => {
     store.deleteDiaryEntry(row.id)
   })
-}
-
-function onNameFieldBlur() {
-  editDraft.value.name = String(editDraft.value.name || '').trim()
-  setTimeout(() => {
-    showNameSuggestions.value = false
-  }, 120)
-}
-
-function onNameInputChanged() {
-  showNameSuggestions.value = true
-}
-
-function chooseNameSuggestion(suggestion) {
-  editDraft.value = {
-    ...editDraft.value,
-    name: String(suggestion.name || '').trim(),
-    amount: suggestion.amount || '',
-    calories: Number(suggestion.calories) || 0,
-    usePer100g: Boolean(suggestion.usePer100g),
-    caloriesPer100g: suggestion.caloriesPer100g ?? null
-  }
-  showNameSuggestions.value = false
 }
 
 function openSuggestionPicker(section, forEntryDialog = false) {
@@ -969,15 +711,10 @@ function openSuggestionPicker(section, forEntryDialog = false) {
 
 function loadSuggestion(suggestion) {
   if (suggestionForEntryDialog.value && showEntryDialog.value) {
-    editDraft.value = {
-      ...editDraft.value,
-      name: suggestion.name,
-      amount: suggestion.amount || '',
-      calories: Number(suggestion.calories) || 0,
-      usePer100g: Boolean(suggestion.usePer100g),
-      caloriesPer100g: suggestion.caloriesPer100g ?? null,
-      section: editDraft.value.section || suggestionTargetSection.value || ''
-    }
+    entryDialogRef.value?.applySuggestion({
+      ...suggestion,
+      section: suggestionTargetSection.value || ''
+    })
   } else {
     store.addDiaryEntry(selectedDate.value, {
       name: suggestion.name,
@@ -1069,19 +806,4 @@ ensureBudgetSnapshot(selectedDate.value)
   color: #fff;
 }
 
-.name-field-wrap {
-  position: relative;
-}
-
-.name-suggestion-list {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  right: 0;
-  z-index: 25;
-  max-height: 220px;
-  overflow-y: auto;
-  background: #fff;
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.14);
-}
 </style>

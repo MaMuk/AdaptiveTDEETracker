@@ -54,8 +54,8 @@
         <div class="col-12 col-md-2">
           <div class="row items-center no-wrap q-gutter-xs">
             <q-select
-              class="col"
               v-model.number="pageSize"
+              class="col"
               dense
               filled
               emit-value
@@ -150,17 +150,27 @@
               v-for="item in pagedItems"
               :key="item.id"
             >
-              <td v-if="visibleColumns.name">{{ item.name || '-' }}</td>
-              <td v-if="visibleColumns.amount">{{ item.amount || '-' }}</td>
-              <td v-if="visibleColumns.calories">{{ item.usePer100g ? item.caloriesPer100g : item.calories }}</td>
+              <td v-if="visibleColumns.name">
+                {{ item.name || '-' }}
+              </td>
+              <td v-if="visibleColumns.amount">
+                {{ item.amount || '-' }}
+              </td>
+              <td v-if="visibleColumns.calories">
+                {{ item.usePer100g ? item.caloriesPer100g : item.calories }}
+              </td>
               <td v-if="visibleColumns.usePer100g">
                 <q-icon
                   v-if="item.usePer100g"
                   name="calculate"
                 />
               </td>
-              <td v-if="visibleColumns.tags">{{ item.tagsCsv || '-' }}</td>
-              <td v-if="visibleColumns.notes">{{ item.notes || '-' }}</td>
+              <td v-if="visibleColumns.tags">
+                {{ item.tagsCsv || '-' }}
+              </td>
+              <td v-if="visibleColumns.notes">
+                {{ item.notes || '-' }}
+              </td>
               <td class="text-right no-wrap">
                 <div class="row justify-end items-center no-wrap q-gutter-xs">
                   <q-btn
@@ -220,108 +230,19 @@
       </q-card-section>
     </q-card>
 
-    <q-dialog
+    <EntryDialog
       v-model="showSuggestionDialog"
-      persistent
-    >
-      <q-card style="min-width: 320px; width: 100%; max-width: 640px;">
-        <q-card-section>
-          <div class="text-h6">
-            {{ suggestionDraft.id ? 'Edit Suggestion' : 'New Suggestion' }}
-          </div>
-        </q-card-section>
-
-        <q-card-section class="q-pt-none">
-          <div class="row q-col-gutter-sm">
-            <div class="col-12 col-md-8">
-              <q-input
-                v-model="suggestionDraft.name"
-                dense
-                filled
-                label="Name"
-                autofocus
-              />
-            </div>
-            <div class="col-12 col-md-4">
-              <q-input
-                v-model="suggestionDraft.amount"
-                dense
-                filled
-                label="Amount"
-              />
-            </div>
-            <div class="col-12 col-md-4">
-              <q-input
-                v-model.number="suggestionDraft.calories"
-                dense
-                filled
-                type="number"
-                min="0"
-                step="1"
-                label="Calories"
-                :disable="suggestionDraft.usePer100g"
-              />
-            </div>
-            <div class="col-12 col-md-4">
-              <q-input
-                v-model.number="suggestionDraft.caloriesPer100g"
-                dense
-                filled
-                type="number"
-                min="0"
-                step="1"
-                label="Calories per 100 g"
-                :disable="!suggestionDraft.usePer100g"
-              />
-            </div>
-            <div class="col-12 col-md-4 flex items-center">
-              <q-checkbox
-                v-model="suggestionDraft.usePer100g"
-              >
-                <template #default>
-                  <div class="row items-center no-wrap q-gutter-xs">
-                    <q-icon name="calculate" />
-                    <span>Calculated</span>
-                  </div>
-                </template>
-              </q-checkbox>
-            </div>
-            <div class="col-12">
-              <q-input
-                v-model="suggestionDraft.tagsCsv"
-                dense
-                filled
-                label="Tags"
-                placeholder="protein, breakfast"
-              />
-            </div>
-            <div class="col-12">
-              <q-input
-                v-model="suggestionDraft.notes"
-                dense
-                filled
-                type="textarea"
-                autogrow
-                label="Notes"
-              />
-            </div>
-          </div>
-        </q-card-section>
-
-        <q-card-actions align="right">
-          <q-btn
-            flat
-            label="Cancel"
-            @click="closeSuggestionDialog"
-          />
-          <q-btn
-            color="primary"
-            :label="suggestionDraft.id ? 'Save' : 'Add'"
-            @click="saveSuggestionDraft"
-          />
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
+      :entry="suggestionDialogEntry"
+      :sections="[]"
+      :suggestions="rankedItems"
+      :title="suggestionDialogEntry?.id ? 'Edit Suggestion' : 'New Suggestion'"
+      :save-label="suggestionDialogEntry?.id ? 'Save' : 'Add'"
+      :enable-suggestion-picker="false"
+      :show-metadata-fields="true"
+      :measurement-units="store.measurementUnits"
+      :measurement-unit-multipliers="store.measurementUnitMultipliers"
+      @save="saveSuggestionFromDialog"
+    />
   </q-page>
 </template>
 
@@ -330,6 +251,7 @@ import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useQuasar } from 'quasar'
 import { useUserStore } from '../stores/user'
+import EntryDialog from '../components/EntryDialog.vue'
 
 const store = useUserStore()
 const router = useRouter()
@@ -355,7 +277,7 @@ const columnOptions = [
 ]
 const visibleColumns = computed(() => store.suggestionsVisibleColumns || {})
 const showSuggestionDialog = ref(false)
-const suggestionDraft = ref(defaultSuggestionDraft())
+const suggestionDialogEntry = ref(null)
 
 const rankedItems = computed(() => {
   const q = search.value.trim().toLowerCase()
@@ -431,26 +353,13 @@ function parseTags(value) {
     .filter(Boolean))]
 }
 
-function defaultSuggestionDraft() {
-  return {
-    id: null,
-    name: '',
-    amount: '',
-    calories: 0,
-    usePer100g: false,
-    caloriesPer100g: null,
-    notes: '',
-    tagsCsv: ''
-  }
-}
-
 function openAddSuggestionDialog() {
-  suggestionDraft.value = defaultSuggestionDraft()
+  suggestionDialogEntry.value = null
   showSuggestionDialog.value = true
 }
 
 function openEditSuggestionDialog(item) {
-  suggestionDraft.value = {
+  suggestionDialogEntry.value = {
     id: item.id,
     name: String(item.name || ''),
     amount: String(item.amount || ''),
@@ -458,52 +367,30 @@ function openEditSuggestionDialog(item) {
     usePer100g: Boolean(item.usePer100g),
     caloriesPer100g: item.caloriesPer100g ?? null,
     notes: String(item.notes || ''),
-    tagsCsv: String(item.tagsCsv || '')
+    tagsCsv: String(item.tagsCsv || ''),
+    tags: Array.isArray(item.tags) ? item.tags : []
   }
   showSuggestionDialog.value = true
 }
 
-function closeSuggestionDialog() {
-  showSuggestionDialog.value = false
-  suggestionDraft.value = defaultSuggestionDraft()
-}
-
-function saveSuggestionDraft() {
-  const name = String(suggestionDraft.value.name || '').trim()
-  const amount = String(suggestionDraft.value.amount || '').trim()
-  const calories = Number(suggestionDraft.value.calories)
-  const caloriesPer100g = Number(suggestionDraft.value.caloriesPer100g)
-  const usePer100g = Boolean(suggestionDraft.value.usePer100g)
-
-  if (!name) {
-    $q.notify({ type: 'negative', message: 'Suggestion name is required.' })
-    return
-  }
-  if (usePer100g && (!Number.isFinite(caloriesPer100g) || caloriesPer100g < 0)) {
-    $q.notify({ type: 'negative', message: 'Calories per 100 g must be valid.' })
-    return
-  }
-  if (!usePer100g && (!Number.isFinite(calories) || calories < 0)) {
-    $q.notify({ type: 'negative', message: 'Calories must be valid.' })
-    return
+function saveSuggestionFromDialog(entryPayload) {
+  const normalizedPayload = {
+    name: String(entryPayload.name || '').trim(),
+    amount: String(entryPayload.amount || '').trim(),
+    calories: Number(entryPayload.calories) || 0,
+    usePer100g: Boolean(entryPayload.usePer100g),
+    caloriesPer100g: entryPayload.usePer100g ? Number(entryPayload.caloriesPer100g) : null,
+    notes: String(entryPayload.notes || '').trim(),
+    tags: parseTags(entryPayload.tagsCsv)
   }
 
-  const payload = {
-    name,
-    amount,
-    calories: usePer100g ? 0 : calories,
-    usePer100g,
-    caloriesPer100g: usePer100g ? caloriesPer100g : null,
-    notes: String(suggestionDraft.value.notes || '').trim(),
-    tags: parseTags(suggestionDraft.value.tagsCsv)
-  }
-
-  if (suggestionDraft.value.id) {
-    store.updateSuggestion(suggestionDraft.value.id, payload)
+  if (entryPayload.id) {
+    store.updateSuggestion(entryPayload.id, normalizedPayload)
   } else {
-    store.addSuggestion(payload)
+    store.addSuggestion(normalizedPayload)
   }
-  closeSuggestionDialog()
+  showSuggestionDialog.value = false
+  suggestionDialogEntry.value = null
 }
 
 function remove(item) {
