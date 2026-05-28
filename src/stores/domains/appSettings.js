@@ -68,6 +68,9 @@ function sanitizeAppSettings(value) {
     const measurementSystem = MEASUREMENT_SYSTEMS.includes(source.measurementSystem)
         ? source.measurementSystem
         : 'metric'
+    const profileMeasurementSystem = MEASUREMENT_SYSTEMS.includes(source.profileMeasurementSystem)
+        ? source.profileMeasurementSystem
+        : 'metric'
     const unitFallback = measurementSystem === 'imperial' ? IMPERIAL_UNITS : METRIC_UNITS
     const multiplierFallback = measurementSystem === 'imperial' ? IMPERIAL_UNIT_MULTIPLIERS : METRIC_UNIT_MULTIPLIERS
     const measurementUnits = sanitizeMeasurementUnits(source.measurementUnits, unitFallback)
@@ -82,6 +85,7 @@ function sanitizeAppSettings(value) {
         setupCompleted,
         guidedTourCompleted,
         disclaimerAccepted,
+        profileMeasurementSystem,
         measurementSystem,
         measurementUnits,
         measurementUnitMultipliers
@@ -158,6 +162,14 @@ export const useAppSettingsStore = defineStore('appSettings', () => {
         }
     }
 
+    function setProfileMeasurementSystem(value) {
+        const nextSystem = MEASUREMENT_SYSTEMS.includes(value) ? value : 'metric'
+        appSettings.value = {
+            ...appSettings.value,
+            profileMeasurementSystem: nextSystem
+        }
+    }
+
     function setMeasurementUnits(value) {
         const fallbackUnits = appSettings.value.measurementSystem === 'imperial' ? IMPERIAL_UNITS : METRIC_UNITS
         appSettings.value = {
@@ -175,7 +187,11 @@ export const useAppSettingsStore = defineStore('appSettings', () => {
     }
 
     function resetAppSettings() {
-        appSettings.value = sanitizeAppSettings({})
+        appSettings.value = sanitizeAppSettings({
+            setupCompleted: false,
+            guidedTourCompleted: false,
+            disclaimerAccepted: false
+        })
     }
 
     if (localStorage.getItem(STORAGE_KEY)) {
@@ -201,6 +217,7 @@ export const useAppSettingsStore = defineStore('appSettings', () => {
         setSetupCompleted,
         setGuidedTourCompleted,
         setDisclaimerAccepted,
+        setProfileMeasurementSystem,
         setMeasurementSystem,
         setMeasurementUnits,
         setMeasurementUnitMultipliers,

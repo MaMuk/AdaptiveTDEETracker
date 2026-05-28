@@ -6,7 +6,7 @@ import { useSuggestionsStore } from './suggestions'
 import { useAiSettingsStore } from './aiSettings'
 import { useAppSettingsStore } from './appSettings'
 
-const EXPORT_SCHEMA_VERSION = 4
+const EXPORT_SCHEMA_VERSION = 5
 const EXPORT_SECTION_KEYS = ['profile', 'logs', 'foodDiary', 'foodSuggestions', 'appSettings']
 
 export const useDataTransferStore = defineStore('dataTransfer', () => {
@@ -64,7 +64,7 @@ export const useDataTransferStore = defineStore('dataTransfer', () => {
         }
         if (selected.includes('appSettings')) {
             const sanitized = appSettingsStore.sanitizeAppSettings(appSettingsStore.appSettings)
-            const { disclaimerAccepted, ...exportableAppSettings } = sanitized
+            const { disclaimerAccepted: _disclaimerAccepted, ...exportableAppSettings } = sanitized
             payload.sections.appSettings = {
                 appSettings: exportableAppSettings
             }

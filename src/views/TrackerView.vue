@@ -34,7 +34,7 @@
                   </span>
                 </div>
                 <div class="text-body1 text-weight-medium">
-                  {{ store.averageWeight ? store.averageWeight.toFixed(1) : '—' }} kg
+                  {{ formatBodyWeight(store.averageWeight) }}
                 </div>
                 <div
                   class="text-caption"
@@ -58,7 +58,7 @@
                   Goal Weight
                 </div>
                 <div class="text-body1 text-weight-medium">
-                  {{ store.goalWeight ? store.goalWeight.toFixed(1) : '—' }} kg
+                  {{ formatBodyWeight(store.goalWeight) }}
                 </div>
                 <div class="text-caption text-grey-7">
                   {{ goalDifference }}
@@ -274,7 +274,7 @@
                     v-model.number="currentWeight"
                     data-tour="weight-input"
                     type="number"
-                    label="Weight (kg)"
+                    :label="`Weight (${bodyWeightUnitLabel})`"
                     filled
                     dense
                     step="0.1"
@@ -500,7 +500,7 @@
           @click="jumpToDate(log.date)"
         >
           <div class="text-right">
-            <div>{{ log.weight }} kg</div>
+            <div>{{ formatBodyWeight(log.weight) }}</div>
             <div class="text-caption">
               {{ log.calories }} kcal
             </div>
@@ -542,6 +542,7 @@ import CalorieBudgetBar from '../components/CalorieBudgetBar.vue'
 import EntryDialog from '../components/EntryDialog.vue'
 import { addDays, parseDateKey, todayKey } from '../utils/dateKey'
 import { calculateDailyCalorieAdjustment, computeCalorieTarget } from '../utils/tdee'
+import { convertWeeklyRateKg, formatWeightFromKg, kgToLb, lbToKg } from '../utils/bodyUnits'
 
 const store = useUserStore()
 const router = useRouter()
@@ -578,19 +579,31 @@ const nextDayDate = computed(() => {
   return addDays(selectedDate.value, 1)
 })
 
+const profileMeasurementSystem = computed(() => store.profileMeasurementSystem || 'metric')
+const bodyWeightUnitLabel = computed(() => profileMeasurementSystem.value === 'imperial' ? 'lb' : 'kg')
+
+function formatBodyWeight(weightKg, digits = 1) {
+  return formatWeightFromKg(weightKg, profileMeasurementSystem.value, digits)
+}
+
 function loadDateData() {
   const existingLog = store.logs.find(l => l.date === selectedDate.value)
   if (existingLog) {
-    currentWeight.value = existingLog.weight
+    currentWeight.value = profileMeasurementSystem.value === 'imperial'
+      ? Number(kgToLb(existingLog.weight)?.toFixed(1))
+      : existingLog.weight
     currentCalories.value = existingLog.calories
   } else {
-    currentWeight.value = store.currentWeight
+    currentWeight.value = profileMeasurementSystem.value === 'imperial'
+      ? Number(kgToLb(store.currentWeight)?.toFixed(1))
+      : store.currentWeight
     currentCalories.value = null
   }
 }
 
 loadDateData()
 watch(selectedDate, () => loadDateData())
+watch(profileMeasurementSystem, () => loadDateData())
 isDevModeEnabled.value = localStorage.getItem('tdee_dev_mode_enabled') === 'true'
 dismissedSevenDayDeltaWarningUntil.value = Number(localStorage.getItem(SEVEN_DAY_DELTA_WARNING_DISMISS_KEY)) || 0
 
@@ -699,7 +712,7 @@ const weightChangeText = computed(() => {
   if (!store.startWeight || !store.averageWeight) return '—'
   const change = store.averageWeight - store.startWeight
   const prefix = change >= 0 ? '+' : ''
-  return `${prefix}${change.toFixed(1)} kg from start`
+  return `${prefix}${Number(convertWeeklyRateKg(Math.abs(change), profileMeasurementSystem.value)).toFixed(1)} ${bodyWeightUnitLabel.value} from start`
 })
 
 const weightChangeClass = computed(() => {
@@ -716,7 +729,7 @@ const goalDifference = computed(() => {
   const diff = Math.abs(store.goalWeight - store.averageWeight)
   if (store.weeklyRate === 0) return 'Maintain'
   const direction = store.goalWeight < store.averageWeight ? 'to lose' : 'to gain'
-  return `${diff.toFixed(1)} kg ${direction}`
+  return `${Number(convertWeeklyRateKg(diff, profileMeasurementSystem.value)).toFixed(1)} ${bodyWeightUnitLabel.value} ${direction}`
 })
 
 const weeksToGoal = computed(() => {
@@ -813,7 +826,7 @@ const sevenDayWeightDelta = computed(() => {
   if (latestWeight === null || latestWeight === undefined || baselineWeight === null || baselineWeight === undefined) return '—'
   const change = latestWeight - baselineWeight
   const prefix = change >= 0 ? '+' : ''
-  return `${prefix}${change.toFixed(2)} kg`
+  return `${prefix}${Number(convertWeeklyRateKg(change, profileMeasurementSystem.value)).toFixed(2)} ${bodyWeightUnitLabel.value}`
 })
 
 const sevenDayWeightDeltaKg = computed(() => {
@@ -863,19 +876,19 @@ const sevenDayDeltaWarning = computed(() => {
 
   const ratePercent = (weeklyDelta / bodyWeight) * 100
   const prettyRate = ratePercent.toFixed(2)
-  const prettyKg = weeklyDelta.toFixed(2)
+  const displayDelta = Number(convertWeeklyRateKg(weeklyDelta, profileMeasurementSystem.value)).toFixed(2)
 
   if (ratePercent > 1.5) {
     return {
       level: 'strong',
-      message: `Your recent weight trend changes body weight very rapidly at about ${prettyRate}% or ${prettyKg} kg per week. This may be unsafe without professional supervision.`
+      message: `Your recent weight trend changes body weight very rapidly at about ${prettyRate}% or ${displayDelta} ${bodyWeightUnitLabel.value} per week. This may be unsafe without professional supervision.`
     }
   }
 
   if (ratePercent > 1.0 || weeklyDelta > 0.5) {
     return {
       level: 'mild',
-      message: `Your recent weight trend changes body weight rapidly at about ${prettyRate}% or ${prettyKg} kg per week. Consider reviewing this with a qualified health professional.`
+      message: `Your recent weight trend changes body weight rapidly at about ${prettyRate}% or ${displayDelta} ${bodyWeightUnitLabel.value} per week. Consider reviewing this with a qualified health professional.`
     }
   }
 
@@ -986,7 +999,10 @@ function hasLogsOnDate(date) {
 }
 
 function saveLog() {
-  store.addLog(selectedDate.value, currentWeight.value, currentCalories.value)
+  const weightKg = profileMeasurementSystem.value === 'imperial'
+    ? lbToKg(currentWeight.value)
+    : currentWeight.value
+  store.addLog(selectedDate.value, weightKg, currentCalories.value)
 }
 
 function dismissSevenDayDeltaWarning() {

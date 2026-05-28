@@ -12,7 +12,10 @@
           :start-weight="localStartWeight"
           :goal-weight="localGoalWeight"
           :height="localHeight"
+          :profile-measurement-system="localProfileMeasurementSystem"
+          :profile-measurement-system-options="measurementSystemOptions"
           :show-rate-fields="false"
+          @update:profile-measurement-system="localProfileMeasurementSystem = $event"
           @update:start-weight="localStartWeight = $event"
           @update:goal-weight="localGoalWeight = $event"
           @update:height="localHeight = $event"
@@ -34,6 +37,7 @@
         <ProfileGoalFields
           :start-weight="localStartWeight"
           :goal-weight="localGoalWeight"
+          :profile-measurement-system="localProfileMeasurementSystem"
           :weekly-rate="localWeeklyRate"
           :custom-rate="customRate"
           :body-weight-for-rate="store.averageWeight ?? localStartWeight"
@@ -379,6 +383,7 @@ const localTdeeManualBias = ref(0)
 const localStartupActivityEnabled = ref(false)
 const localStartupActivityLevel = ref('low')
 const localMeasurementSystem = ref('metric')
+const localProfileMeasurementSystem = ref('metric')
 const localMeasurementUnitsText = ref('g, ml, serving')
 const localMeasurementMultipliersText = ref('g:100, ml:100, serving:1')
 const devModeEnabled = ref(false)
@@ -435,6 +440,7 @@ onMounted(() => {
   localStartupActivityEnabled.value = Boolean(store.startupActivityEnabled)
   localStartupActivityLevel.value = store.startupActivityLevel || 'low'
   localMeasurementSystem.value = store.measurementSystem || 'metric'
+  localProfileMeasurementSystem.value = store.profileMeasurementSystem || 'metric'
   localMeasurementUnitsText.value = (Array.isArray(store.measurementUnits) && store.measurementUnits.length > 0
     ? store.measurementUnits
     : (localMeasurementSystem.value === 'imperial' ? IMPERIAL_UNITS : METRIC_UNITS)).join(', ')
@@ -602,6 +608,7 @@ function saveSettings() {
   store.setAiMealRecognitionEnabled(localAiMealRecognitionEnabled.value)
   store.setOpenAiApiKey(localOpenAiApiKey.value)
   store.setMeasurementSystem(localMeasurementSystem.value)
+  store.setProfileMeasurementSystem(localProfileMeasurementSystem.value)
   const units = parseUnits(localMeasurementUnitsText.value, localMeasurementSystem.value)
   store.setMeasurementUnits(units)
   store.setMeasurementUnitMultipliers(parseMultipliers(localMeasurementMultipliersText.value, units, localMeasurementSystem.value))

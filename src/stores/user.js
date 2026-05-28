@@ -137,6 +137,10 @@ export const useUserStore = defineStore('user', () => {
         get: () => appSettingsStore.appSettings.measurementSystem,
         set: (v) => { appSettingsStore.setMeasurementSystem(v) }
     })
+    const profileMeasurementSystem = computed({
+        get: () => appSettingsStore.appSettings.profileMeasurementSystem,
+        set: (v) => { appSettingsStore.setProfileMeasurementSystem(v) }
+    })
     const measurementUnits = computed({
         get: () => appSettingsStore.appSettings.measurementUnits,
         set: (v) => { appSettingsStore.setMeasurementUnits(v) }
@@ -153,6 +157,11 @@ export const useUserStore = defineStore('user', () => {
         aiStore.resetAiSettings()
         appSettingsStore.resetAppSettings()
         localStorage.removeItem(LEGACY_STORAGE_KEY)
+        localStorage.removeItem(PROFILE_STORAGE_KEY)
+        localStorage.removeItem(DIARY_STORAGE_KEY)
+        localStorage.removeItem(SUGGESTIONS_STORAGE_KEY)
+        localStorage.removeItem(AI_STORAGE_KEY)
+        localStorage.removeItem(APP_SETTINGS_STORAGE_KEY)
     }
 
     return {
@@ -187,6 +196,7 @@ export const useUserStore = defineStore('user', () => {
         guidedTourCompleted,
         disclaimerAccepted,
         measurementSystem,
+        profileMeasurementSystem,
         measurementUnits,
         measurementUnitMultipliers,
         addLog: profileStore.addLog,
@@ -209,6 +219,7 @@ export const useUserStore = defineStore('user', () => {
         setSetupCompleted: appSettingsStore.setSetupCompleted,
         setGuidedTourCompleted: appSettingsStore.setGuidedTourCompleted,
         setDisclaimerAccepted: appSettingsStore.setDisclaimerAccepted,
+        setProfileMeasurementSystem: appSettingsStore.setProfileMeasurementSystem,
         setMeasurementSystem: appSettingsStore.setMeasurementSystem,
         setMeasurementUnits: appSettingsStore.setMeasurementUnits,
         setMeasurementUnitMultipliers: appSettingsStore.setMeasurementUnitMultipliers,

@@ -70,6 +70,7 @@
 import { computed, ref } from 'vue'
 import { useUserStore } from '../stores/user'
 import { addDays, diffDays, formatDateKeyLocal, parseDateKey, todayKey } from '../utils/dateKey'
+import { convertWeeklyRateKg, kgToLb } from '../utils/bodyUnits'
 import { Line } from 'vue-chartjs'
 import {
   Chart as ChartJS,
@@ -97,6 +98,8 @@ ChartJS.register(
 )
 
 const store = useUserStore()
+const profileMeasurementSystem = computed(() => store.profileMeasurementSystem || 'metric')
+const bodyWeightUnitLabel = computed(() => profileMeasurementSystem.value === 'imperial' ? 'lb' : 'kg')
 
 const weeklyColumns = [
   { name: 'delta', label: 'Δ Week', field: 'delta', align: 'center', sortable: true, style: 'width: 25%' },
@@ -148,7 +151,8 @@ const weeklyStats = computed(() => {
         const prevAvgWeight = prevWeightsWithData.reduce((sum, l) => sum + l.weight, 0) / prevWeightsWithData.length
         const change = avgWeight - prevAvgWeight
         const prefix = change >= 0 ? '+' : ''
-        delta = `${prefix}${change.toFixed(2)} kg`
+        const display = Number(convertWeeklyRateKg(change, profileMeasurementSystem.value))
+        delta = `${prefix}${display.toFixed(2)} ${bodyWeightUnitLabel.value}`
       }
     }
 
@@ -156,7 +160,7 @@ const weeklyStats = computed(() => {
     
     stats.push({
       week: formatDateShort(weekStart),
-      avgWeight: avgWeight ? `${avgWeight.toFixed(1)} kg` : '—',
+      avgWeight: avgWeight ? `${Number(convertWeeklyRateKg(avgWeight, profileMeasurementSystem.value)).toFixed(1)} ${bodyWeightUnitLabel.value}` : '—',
       avgCalories: avgCalories ? Math.round(avgCalories) : '—',
       delta: delta,
       rawDelta: delta === '—' ? 0 : parseFloat(delta)
@@ -261,7 +265,8 @@ const weightChartData = computed(() => {
     const log = sortedLogs.find(l => {
       return l.date === dateKey
     })
-    return log ? log.weight : null
+    if (!log) return null
+    return profileMeasurementSystem.value === 'imperial' ? kgToLb(log.weight) : log.weight
   })
 
   const goalLine = []
@@ -269,12 +274,13 @@ const weightChartData = computed(() => {
     allDates.forEach(date => {
       const daysDiff = (date - firstDate) / (1000 * 60 * 60 * 24)
       const weeksDiff = daysDiff / 7
-      const expectedWeight = store.startWeight + (store.weeklyRate * weeksDiff)
+      const expectedWeightKg = store.startWeight + (store.weeklyRate * weeksDiff)
+      const expectedWeight = profileMeasurementSystem.value === 'imperial' ? kgToLb(expectedWeightKg) : expectedWeightKg
       goalLine.push(expectedWeight)
     })
   }
 
-  const trendLine = calculateTrendLineExtended(sortedLogs, allDates, firstDate, trendEndDate)
+  const trendLine = calculateTrendLineExtended(sortedLogs, allDates, firstDate, trendEndDate, profileMeasurementSystem.value)
 
   const datasets = [
     {
@@ -323,7 +329,7 @@ const weightChartData = computed(() => {
   }
 })
 
-function calculateTrendLineExtended(logs, allDates, firstDate, trendEndDate) {
+function calculateTrendLineExtended(logs, allDates, firstDate, trendEndDate, bodySystem) {
   if (logs.length < 2) return []
 
   const firstDateTime = firstDate.getTime()
@@ -355,7 +361,8 @@ function calculateTrendLineExtended(logs, allDates, firstDate, trendEndDate) {
       return null
     }
     const daysSinceStart = (date.getTime() - firstDateTime) / (1000 * 60 * 60 * 24)
-    return slope * daysSinceStart + intercept
+    const valueKg = slope * daysSinceStart + intercept
+    return bodySystem === 'imperial' ? kgToLb(valueKg) : valueKg
   })
 }
 
@@ -377,7 +384,7 @@ const weightChartOptions = computed(() => ({
       beginAtZero: false,
       title: {
         display: true,
-        text: 'Weight (kg)'
+        text: `Weight (${bodyWeightUnitLabel.value})`
       },
       ticks: {
         callback: function(value) {

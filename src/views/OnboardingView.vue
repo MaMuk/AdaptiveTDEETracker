@@ -19,6 +19,7 @@
           flat
           animated
           color="primary"
+          :vertical="$q.screen.lt.sm"
         >
           <q-step
             :name="1"
@@ -50,10 +51,13 @@
               :start-weight="localStartWeight"
               :goal-weight="localGoalWeight"
               :height="localHeight"
+              :profile-measurement-system="localProfileMeasurementSystem"
+              :profile-measurement-system-options="measurementSystemOptions"
               :weekly-rate="localWeeklyRate"
               :custom-rate="customRate"
               :body-weight-for-rate="store.averageWeight ?? localStartWeight"
               :rate-options="rateOptions"
+              @update:profile-measurement-system="localProfileMeasurementSystem = $event"
               @update:start-weight="localStartWeight = $event"
               @update:goal-weight="localGoalWeight = $event"
               @update:height="localHeight = $event"
@@ -97,9 +101,16 @@
 
           <q-step
             :name="4"
-            title="Startup Activity Assist"
+            title="Assist"
             icon="directions_run"
           >
+            <div class="text-body2 q-mb-sm">
+              Assist helps stabilize calorie estimates during your first weeks of tracking by blending:
+              your profile-based maintenance estimate and your log-based trend estimate.
+            </div>
+            <div class="text-caption text-grey-7 q-mb-sm">
+              Set blend to <strong>0</strong> for log-only, <strong>1</strong> for profile/activity-only, or keep it in between for a mixed estimate while data is still sparse.
+            </div>
             <StartupAssistFields
               :enabled="enableStartupAssist"
               :activity-level="localStartupActivityLevel"
@@ -110,7 +121,7 @@
               :sex-options="sexOptions"
               :show-enable-toggle="true"
               :show-banner="false"
-              caption="Optional startup profile-assist during early tracking."
+              caption="Optional support during early tracking."
               enable-label="Enable startup activity assist"
               @update:enabled="enableStartupAssist = $event"
               @update:activity-level="localStartupActivityLevel = $event"
@@ -199,6 +210,7 @@ const localSectionPercentages = ref({})
 const localAiMealRecognitionEnabled = ref(false)
 const localOpenAiApiKey = ref('')
 const localMeasurementSystem = ref('metric')
+const localProfileMeasurementSystem = ref('metric')
 const localMeasurementUnitsText = ref('g, ml, serving')
 const localMeasurementMultipliersText = ref('g:100, ml:100, serving:1')
 
@@ -227,6 +239,7 @@ const measurementSystemOptions = [
   { label: 'Metric', value: 'metric' },
   { label: 'Imperial', value: 'imperial' }
 ]
+
 const METRIC_UNITS = ['g', 'ml', 'serving']
 const IMPERIAL_UNITS = ['oz', 'fl oz', 'serving']
 const METRIC_MULTIPLIERS = { g: 100, ml: 100, serving: 1 }
@@ -251,6 +264,7 @@ onMounted(() => {
   localAiMealRecognitionEnabled.value = isFreshSetup ? false : Boolean(store.aiMealRecognitionEnabled)
   localOpenAiApiKey.value = isFreshSetup ? '' : (store.openAiApiKey || '')
   localMeasurementSystem.value = store.measurementSystem || 'metric'
+  localProfileMeasurementSystem.value = store.profileMeasurementSystem || 'metric'
   localMeasurementUnitsText.value = (Array.isArray(store.measurementUnits) && store.measurementUnits.length > 0
     ? store.measurementUnits
     : (localMeasurementSystem.value === 'imperial' ? IMPERIAL_UNITS : METRIC_UNITS)).join(', ')
@@ -417,6 +431,7 @@ function finishSetup() {
   store.setAiMealRecognitionEnabled(localFoodDiaryEnabled.value ? localAiMealRecognitionEnabled.value : false)
   store.setOpenAiApiKey(localFoodDiaryEnabled.value && localAiMealRecognitionEnabled.value ? localOpenAiApiKey.value : '')
   store.setMeasurementSystem(localMeasurementSystem.value)
+  store.setProfileMeasurementSystem(localProfileMeasurementSystem.value)
   const units = parseUnits(localMeasurementUnitsText.value, localMeasurementSystem.value)
   store.setMeasurementUnits(units)
   store.setMeasurementUnitMultipliers(parseMultipliers(localMeasurementMultipliersText.value, units, localMeasurementSystem.value))
