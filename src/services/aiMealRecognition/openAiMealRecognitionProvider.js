@@ -14,7 +14,7 @@ const RECOGNITION_JSON_SCHEMA = {
       items: {
         type: 'object',
         additionalProperties: false,
-        required: ['name', 'calories', 'caloriesPer100g', 'confidence'],
+        required: ['name', 'calories', 'caloriesPer100', 'caloriesPer100Basis', 'confidence'],
         properties: {
           name: { type: 'string' },
           calories: {
@@ -27,11 +27,15 @@ const RECOGNITION_JSON_SCHEMA = {
               high: { type: 'number' }
             }
           },
-          caloriesPer100g: {
+          caloriesPer100: {
             anyOf: [
               { type: 'number' },
               { type: 'null' }
             ]
+          },
+          caloriesPer100Basis: {
+            type: 'string',
+            enum: ['g', 'ml']
           },
           confidence: {
             type: 'string',
@@ -67,19 +71,22 @@ export class OpenAiMealRecognitionProvider extends AiMealRecognitionProvider {
           {
             name: 'Double cheeseburger with two beef patties and cheese',
             calories: { low: 450, estimate: 520, high: 600 },
-            caloriesPer100g: 265,
+            caloriesPer100: 265,
+            caloriesPer100Basis: 'g',
             confidence: 'high'
           },
           {
             name: 'Cheeseburger with a beef patty and cheese slice',
             calories: { low: 300, estimate: 380, high: 450 },
-            caloriesPer100g: 250,
+            caloriesPer100: 250,
+            caloriesPer100Basis: 'g',
             confidence: 'medium'
           },
           {
             name: 'Cheeseburger with added grilled onions',
             calories: { low: 320, estimate: 400, high: 480 },
-            caloriesPer100g: 240,
+            caloriesPer100: 240,
+            caloriesPer100Basis: 'g',
             confidence: 'medium'
           }
         ]
@@ -149,7 +156,7 @@ function buildPrompt(options = {}) {
   const base = [
     'Estimate calories from this food photo for a calorie-only TDEE app.',
     'Return strict JSON only with this exact shape:',
-    '{"guesses":[{"name":"string","calories":{"low":number,"estimate":number,"high":number},"caloriesPer100g":number|null,"confidence":"low|medium|high"}]}.',
+    '{"guesses":[{"name":"string","calories":{"low":number,"estimate":number,"high":number},"caloriesPer100":number|null,"caloriesPer100Basis":"g|ml","confidence":"low|medium|high"}]}.',
     'Provide up to 4 plausible guesses.',
     'Avoid fake precision. Keep ranges realistic.',
     'No macros. No explanation text.'
@@ -162,7 +169,7 @@ function buildPrompt(options = {}) {
   if (context === 'suggestions') {
     base.push('This is for a reusable food suggestion table, not an immediate diary meal.')
     base.push('Recognize generic products and packaged foods when visible.')
-    base.push('Always include caloriesPer100g for each guess.')
+    base.push('Always include caloriesPer100 and caloriesPer100Basis for each guess.')
   }
 
   if (isNutritionLabel) {

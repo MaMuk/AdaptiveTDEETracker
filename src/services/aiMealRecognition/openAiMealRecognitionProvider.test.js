@@ -38,7 +38,8 @@ async function testUsesJsonSchemaRequestFormat() {
                   {
                     name: 'Soup',
                     calories: { low: 100, estimate: 150, high: 220 },
-                    caloriesPer100g: 65,
+                    caloriesPer100: 65,
+                    caloriesPer100Basis: 'g',
                     confidence: 'high'
                   }
                 ]
@@ -65,7 +66,7 @@ async function testFallsBackToSanitizedTextParsing() {
   const provider = new OpenAiMealRecognitionProvider()
 
   await withMockedFetch(async () => createJsonResponse({
-    output_text: '```json\n{"guesses":[{"name":"Burger","calories":{"low":350,"estimate":420,"high":500},"caloriesPer100g":255,"confidence":"medium"}]}\n```'
+    output_text: '```json\n{"guesses":[{"name":"Burger","calories":{"low":350,"estimate":420,"high":500},"caloriesPer100":255,"caloriesPer100Basis":"g","confidence":"medium"}]}\n```'
   }), async () => {
     const result = await provider.recognizeMealFromImage({
       apiKey: 'test-key',
@@ -103,7 +104,8 @@ async function testRejectsNoUsableGuessesFromStructuredOutput() {
         {
           name: '   ',
           calories: { low: 10, estimate: 20, high: 30 },
-          caloriesPer100g: 12,
+          caloriesPer100: 12,
+          caloriesPer100Basis: 'g',
           confidence: 'medium'
         }
       ]

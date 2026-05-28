@@ -6,7 +6,7 @@ import { useSuggestionsStore } from './suggestions'
 import { useAiSettingsStore } from './aiSettings'
 import { useAppSettingsStore } from './appSettings'
 
-const EXPORT_SCHEMA_VERSION = 5
+const EXPORT_SCHEMA_VERSION = 6
 const EXPORT_SECTION_KEYS = ['profile', 'logs', 'foodDiary', 'foodSuggestions', 'appSettings']
 
 export const useDataTransferStore = defineStore('dataTransfer', () => {
@@ -48,18 +48,41 @@ export const useDataTransferStore = defineStore('dataTransfer', () => {
             }
         }
         if (selected.includes('foodDiary')) {
+            const normalizedEntries = (Array.isArray(diaryStore.foodDiaryEntries) ? diaryStore.foodDiaryEntries : []).map((entry) => ({
+                id: entry.id,
+                date: entry.date,
+                name: entry.name,
+                amount: entry.amount || '',
+                calories: Number(entry.calories),
+                section: entry.section || '',
+                densityMode: entry.densityMode === 'per100' ? 'per100' : 'none',
+                densityBasis: entry.densityBasis === 'volume' ? 'volume' : 'mass',
+                densityKcalPer100Canonical: Number.isFinite(Number(entry.densityKcalPer100Canonical))
+                    ? Number(entry.densityKcalPer100Canonical)
+                    : null
+            }))
             payload.sections.foodDiary = {
                 foodDiaryEnabled: Boolean(diaryStore.foodDiaryEnabled),
                 diarySections: Array.isArray(diaryStore.diarySections) ? [...diaryStore.diarySections] : ['Breakfast', 'Lunch', 'Dinner', 'Snacks'],
                 diarySectionPercentages: { ...(diaryStore.diarySectionPercentages || {}) },
-                foodDiaryEntries: Array.isArray(diaryStore.foodDiaryEntries) ? [...diaryStore.foodDiaryEntries] : [],
+                foodDiaryEntries: normalizedEntries,
                 diaryClosedSectionsByDate: { ...(diaryStore.diaryClosedSectionsByDate || {}) },
                 diaryBudgetSnapshotsByDate: { ...(diaryStore.diaryBudgetSnapshotsByDate || {}) }
             }
         }
         if (selected.includes('foodSuggestions')) {
+            const normalizedSuggestions = (Array.isArray(suggestionsStore.foodSuggestions) ? suggestionsStore.foodSuggestions : []).map((item) => ({
+                ...item,
+                densityMode: item.densityMode === 'per100' ? 'per100' : 'none',
+                densityBasis: item.densityBasis === 'volume' ? 'volume' : 'mass',
+                densityKcalPer100Canonical: Number.isFinite(Number(item.densityKcalPer100Canonical))
+                    ? Number(item.densityKcalPer100Canonical)
+                    : null,
+                usePer100g: undefined,
+                caloriesPer100g: undefined
+            }))
             payload.sections.foodSuggestions = {
-                foodSuggestions: Array.isArray(suggestionsStore.foodSuggestions) ? [...suggestionsStore.foodSuggestions] : []
+                foodSuggestions: normalizedSuggestions
             }
         }
         if (selected.includes('appSettings')) {

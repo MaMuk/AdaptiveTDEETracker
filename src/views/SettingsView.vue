@@ -78,15 +78,13 @@
           :section-percentages="localSectionPercentages"
           :total-section-percentage="totalSectionPercentage"
           :measurement-system="localMeasurementSystem"
-          :measurement-units-text="localMeasurementUnitsText"
-          :measurement-multipliers-text="localMeasurementMultipliersText"
+          :measurement-units="localMeasurementUnits"
           :measurement-system-options="measurementSystemOptions"
           @update:enabled="localFoodDiaryEnabled = $event"
           @update:sections-text="localDiarySectionsText = $event"
           @update:section-percentage="onSectionPercentageUpdate"
           @update:measurement-system="applyMeasurementPreset"
-          @update:measurement-units-text="localMeasurementUnitsText = $event"
-          @update:measurement-multipliers-text="localMeasurementMultipliersText = $event"
+          @update:measurement-units="localMeasurementUnits = $event"
         />
       </q-card-section>
     </q-card>
@@ -327,6 +325,7 @@ import { useRouter } from 'vue-router'
 import { useQuasar } from 'quasar'
 import { useUserStore } from '../stores/user'
 import { startGuidedProductTour } from '../services/guidedTour'
+import { getPrimaryPresetUnits } from '../utils/unitLibrary'
 import packageJson from '../../package.json'
 import ProfileGoalFields from '../components/setup/ProfileGoalFields.vue'
 import StartupAssistFields from '../components/setup/StartupAssistFields.vue'
@@ -362,10 +361,6 @@ const measurementSystemOptions = [
   { label: 'Metric', value: 'metric' },
   { label: 'Imperial', value: 'imperial' }
 ]
-const METRIC_UNITS = ['g', 'ml', 'serving']
-const IMPERIAL_UNITS = ['oz', 'fl oz', 'serving']
-const METRIC_MULTIPLIERS = { g: 100, ml: 100, serving: 1 }
-const IMPERIAL_MULTIPLIERS = { oz: 100, 'fl oz': 100, serving: 1 }
 
 const localStartWeight = ref(null)
 const localGoalWeight = ref(null)
@@ -384,8 +379,7 @@ const localStartupActivityEnabled = ref(false)
 const localStartupActivityLevel = ref('low')
 const localMeasurementSystem = ref('metric')
 const localProfileMeasurementSystem = ref('metric')
-const localMeasurementUnitsText = ref('g, ml, serving')
-const localMeasurementMultipliersText = ref('g:100, ml:100, serving:1')
+const localMeasurementUnits = ref(['g', 'ml', 'serving'])
 const devModeEnabled = ref(false)
 const nameTapCount = ref(0)
 const attributionName = 'Martin Melmuk'
@@ -441,12 +435,9 @@ onMounted(() => {
   localStartupActivityLevel.value = store.startupActivityLevel || 'low'
   localMeasurementSystem.value = store.measurementSystem || 'metric'
   localProfileMeasurementSystem.value = store.profileMeasurementSystem || 'metric'
-  localMeasurementUnitsText.value = (Array.isArray(store.measurementUnits) && store.measurementUnits.length > 0
+  localMeasurementUnits.value = (Array.isArray(store.measurementUnits) && store.measurementUnits.length > 0
     ? store.measurementUnits
-    : (localMeasurementSystem.value === 'imperial' ? IMPERIAL_UNITS : METRIC_UNITS)).join(', ')
-  localMeasurementMultipliersText.value = Object.entries(store.measurementUnitMultipliers || (localMeasurementSystem.value === 'imperial' ? IMPERIAL_MULTIPLIERS : METRIC_MULTIPLIERS))
-    .map(([unit, value]) => `${unit}:${value}`)
-    .join(', ')
+    : getPrimaryPresetUnits(localMeasurementSystem.value))
   devModeEnabled.value = localStorage.getItem('tdee_dev_mode_enabled') === 'true'
   if (devModeEnabled.value) {
     ensureDevScenarioModuleLoaded()
@@ -533,37 +524,9 @@ watch(() => store.startupActivityLevel, value => {
   localStartupActivityLevel.value = value || 'low'
 })
 
-function parseUnits(text, fallbackSystem) {
-  const fallback = fallbackSystem === 'imperial' ? IMPERIAL_UNITS : METRIC_UNITS
-  const units = [...new Set(String(text || '')
-    .split(',')
-    .map(unit => unit.trim().toLowerCase())
-    .filter(Boolean))]
-  return units.length > 0 ? units : [...fallback]
-}
-
-function parseMultipliers(text, units, fallbackSystem) {
-  const fallback = fallbackSystem === 'imperial' ? IMPERIAL_MULTIPLIERS : METRIC_MULTIPLIERS
-  const out = {}
-  for (const unit of units) {
-    out[unit] = Number(fallback[unit]) > 0 ? Number(fallback[unit]) : 1
-  }
-  const parts = String(text || '').split(',')
-  for (const part of parts) {
-    const [rawUnit, rawValue] = String(part).split(':')
-    const unit = String(rawUnit || '').trim().toLowerCase()
-    const value = Number(rawValue)
-    if (!unit || !units.includes(unit) || !Number.isFinite(value) || value <= 0) continue
-    out[unit] = value
-  }
-  return out
-}
-
 function applyMeasurementPreset(system) {
   localMeasurementSystem.value = system === 'imperial' ? 'imperial' : 'metric'
-  localMeasurementUnitsText.value = (localMeasurementSystem.value === 'imperial' ? IMPERIAL_UNITS : METRIC_UNITS).join(', ')
-  const presetMultipliers = localMeasurementSystem.value === 'imperial' ? IMPERIAL_MULTIPLIERS : METRIC_MULTIPLIERS
-  localMeasurementMultipliersText.value = Object.entries(presetMultipliers).map(([unit, value]) => `${unit}:${value}`).join(', ')
+  localMeasurementUnits.value = getPrimaryPresetUnits(localMeasurementSystem.value)
 }
 
 function saveSettings() {
@@ -609,9 +572,7 @@ function saveSettings() {
   store.setOpenAiApiKey(localOpenAiApiKey.value)
   store.setMeasurementSystem(localMeasurementSystem.value)
   store.setProfileMeasurementSystem(localProfileMeasurementSystem.value)
-  const units = parseUnits(localMeasurementUnitsText.value, localMeasurementSystem.value)
-  store.setMeasurementUnits(units)
-  store.setMeasurementUnitMultipliers(parseMultipliers(localMeasurementMultipliersText.value, units, localMeasurementSystem.value))
+  store.setMeasurementUnits(localMeasurementUnits.value)
   
   router.push('/')
 }

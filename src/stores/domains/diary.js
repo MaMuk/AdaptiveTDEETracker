@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, watch } from 'vue'
 import { useSuggestionsStore } from './suggestions'
+import { withLegacyDensityFields, normalizeDensityFields } from '../../utils/nutritionDensity'
 
 const STORAGE_KEY = 'tdee_diary_store'
 const DEFAULT_SECTIONS = ['Breakfast', 'Lunch', 'Dinner', 'Snacks']
@@ -178,12 +179,9 @@ export const useDiaryStore = defineStore('diary', () => {
             amount: entry.amount || '',
             calories: Number(entry.calories),
             section: entry.section || '',
-            usePer100g: Boolean(entry.usePer100g),
-            caloriesPer100g: entry.caloriesPer100g !== null && entry.caloriesPer100g !== undefined
-                ? Number(entry.caloriesPer100g)
-                : null
+            ...normalizeDensityFields(entry)
         }
-        foodDiaryEntries.value.push(normalized)
+        foodDiaryEntries.value.push(withLegacyDensityFields(normalized))
         if (syncSuggestion) suggestionsStore.upsertSuggestionFromEntry(normalized)
     }
 
@@ -196,12 +194,12 @@ export const useDiaryStore = defineStore('diary', () => {
             ...updates,
             calories: Number(updates.calories ?? foodDiaryEntries.value[index].calories),
             section: updates.section ?? foodDiaryEntries.value[index].section ?? '',
-            usePer100g: Boolean(updates.usePer100g ?? foodDiaryEntries.value[index].usePer100g),
-            caloriesPer100g: updates.caloriesPer100g !== undefined
-                ? Number(updates.caloriesPer100g)
-                : foodDiaryEntries.value[index].caloriesPer100g
+            ...normalizeDensityFields({
+                ...foodDiaryEntries.value[index],
+                ...updates
+            })
         }
-        foodDiaryEntries.value[index] = updated
+        foodDiaryEntries.value[index] = withLegacyDensityFields(updated)
         if (syncSuggestion) suggestionsStore.upsertSuggestionFromEntry(updated)
     }
 
@@ -244,7 +242,9 @@ export const useDiaryStore = defineStore('diary', () => {
             diarySections.value = Array.isArray(stored.diarySections) && stored.diarySections.length > 0
                 ? stored.diarySections
                 : [...DEFAULT_SECTIONS]
-            foodDiaryEntries.value = Array.isArray(stored.foodDiaryEntries) ? stored.foodDiaryEntries : []
+            foodDiaryEntries.value = Array.isArray(stored.foodDiaryEntries)
+                ? stored.foodDiaryEntries.map(entry => withLegacyDensityFields(entry))
+                : []
             const legacySections = getLegacyDiarySections(foodDiaryEntries.value, diarySections.value)
             diarySectionPercentages.value = sanitizeSectionPercentages(stored.diarySectionPercentages, diarySections.value, legacySections)
             diaryClosedSectionsByDate.value = sanitizeClosedSectionsByDate(stored.diaryClosedSectionsByDate, diarySections.value, legacySections)

@@ -21,15 +21,17 @@ function sanitizeGuess(rawGuess, provider) {
   const confidence = VALID_CONFIDENCE.has(rawGuess?.confidence)
     ? rawGuess.confidence
     : AI_RECOGNITION_CONFIDENCE.LOW
-  const caloriesPer100gRaw = Number(rawGuess?.caloriesPer100g)
-  const caloriesPer100g = Number.isFinite(caloriesPer100gRaw) && caloriesPer100gRaw >= 0
-    ? Math.round(caloriesPer100gRaw)
+  const caloriesPer100Raw = Number(rawGuess?.caloriesPer100 ?? rawGuess?.caloriesPer100g)
+  const caloriesPer100 = Number.isFinite(caloriesPer100Raw) && caloriesPer100Raw >= 0
+    ? Math.round(caloriesPer100Raw)
     : null
+  const caloriesPer100Basis = rawGuess?.caloriesPer100Basis === 'ml' ? 'ml' : 'g'
 
   return {
     name,
     calories,
-    caloriesPer100g,
+    caloriesPer100,
+    caloriesPer100Basis,
     confidence,
     provider
   }

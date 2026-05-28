@@ -1,14 +1,11 @@
 import { defineStore } from 'pinia'
 import { ref, watch } from 'vue'
 import { resolveSetupCompleted } from '../../utils/setupCompletion'
+import { getPresetUnits, getPrimaryPresetUnits, resolveUnitId } from '../../utils/unitLibrary'
 
 const STORAGE_KEY = 'tdee_app_settings_store'
 const ACTIVITY_LEVELS = ['very_low', 'low', 'moderate', 'high', 'very_high']
 const MEASUREMENT_SYSTEMS = ['metric', 'imperial']
-const METRIC_UNITS = ['g', 'ml', 'serving']
-const IMPERIAL_UNITS = ['oz', 'fl oz', 'serving']
-const METRIC_UNIT_MULTIPLIERS = { g: 100, ml: 100, serving: 1 }
-const IMPERIAL_UNIT_MULTIPLIERS = { oz: 100, 'fl oz': 100, serving: 1 }
 
 const DEFAULT_SUGGESTIONS_VISIBLE_COLUMNS = {
     name: true,
@@ -35,24 +32,15 @@ function sanitizeSuggestionsVisibleColumns(value) {
     return result
 }
 
-function sanitizeMeasurementUnits(value, fallback = METRIC_UNITS) {
+function sanitizeMeasurementUnits(value, fallback = getPrimaryPresetUnits('metric')) {
     const source = Array.isArray(value) ? value : []
-    const units = [...new Set(source
-        .map(unit => String(unit || '').trim().toLowerCase())
-        .filter(Boolean))]
+    const units = [...new Set(source.map(resolveUnitId).filter(Boolean))]
     if (units.length === 0) return [...fallback]
     return units
 }
 
 function sanitizeUnitMultipliers(value, fallbackMap) {
-    const source = value && typeof value === 'object' ? value : {}
-    const out = {}
-    const keys = Object.keys(fallbackMap)
-    for (const key of keys) {
-        const raw = Number(source[key])
-        out[key] = Number.isFinite(raw) && raw > 0 ? raw : fallbackMap[key]
-    }
-    return out
+    return fallbackMap
 }
 
 function sanitizeAppSettings(value) {
@@ -71,8 +59,8 @@ function sanitizeAppSettings(value) {
     const profileMeasurementSystem = MEASUREMENT_SYSTEMS.includes(source.profileMeasurementSystem)
         ? source.profileMeasurementSystem
         : 'metric'
-    const unitFallback = measurementSystem === 'imperial' ? IMPERIAL_UNITS : METRIC_UNITS
-    const multiplierFallback = measurementSystem === 'imperial' ? IMPERIAL_UNIT_MULTIPLIERS : METRIC_UNIT_MULTIPLIERS
+    const unitFallback = getPrimaryPresetUnits(measurementSystem)
+    const multiplierFallback = {}
     const measurementUnits = sanitizeMeasurementUnits(source.measurementUnits, unitFallback)
     const measurementUnitMultipliers = sanitizeUnitMultipliers(source.measurementUnitMultipliers, multiplierFallback)
     return {
@@ -154,11 +142,11 @@ export const useAppSettingsStore = defineStore('appSettings', () => {
 
     function setMeasurementSystem(value) {
         const nextSystem = MEASUREMENT_SYSTEMS.includes(value) ? value : 'metric'
-        const fallbackUnits = nextSystem === 'imperial' ? IMPERIAL_UNITS : METRIC_UNITS
+        const fallbackUnits = getPrimaryPresetUnits(nextSystem)
         appSettings.value = {
             ...appSettings.value,
             measurementSystem: nextSystem,
-            measurementUnits: sanitizeMeasurementUnits(appSettings.value.measurementUnits, fallbackUnits)
+            measurementUnits: sanitizeMeasurementUnits(appSettings.value.measurementUnits, fallbackUnits).filter(Boolean)
         }
     }
 
@@ -171,7 +159,7 @@ export const useAppSettingsStore = defineStore('appSettings', () => {
     }
 
     function setMeasurementUnits(value) {
-        const fallbackUnits = appSettings.value.measurementSystem === 'imperial' ? IMPERIAL_UNITS : METRIC_UNITS
+        const fallbackUnits = getPresetUnits(appSettings.value.measurementSystem)
         appSettings.value = {
             ...appSettings.value,
             measurementUnits: sanitizeMeasurementUnits(value, fallbackUnits)
@@ -179,7 +167,7 @@ export const useAppSettingsStore = defineStore('appSettings', () => {
     }
 
     function setMeasurementUnitMultipliers(value) {
-        const fallbackMap = appSettings.value.measurementSystem === 'imperial' ? IMPERIAL_UNIT_MULTIPLIERS : METRIC_UNIT_MULTIPLIERS
+        const fallbackMap = {}
         appSettings.value = {
             ...appSettings.value,
             measurementUnitMultipliers: sanitizeUnitMultipliers(value, fallbackMap)

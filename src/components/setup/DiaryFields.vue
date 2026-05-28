@@ -63,27 +63,26 @@
       />
     </div>
 
-    <q-input
-      :model-value="measurementUnitsText"
+    <q-select
+      :model-value="measurementUnits"
       class="q-mt-sm"
       filled
-      label="Measured units (comma separated)"
-      hint="Used for Measured entry mode in Diary and Suggestions."
-      @update:model-value="emit('update:measurementUnitsText', String($event || ''))"
-    />
-
-    <q-input
-      :model-value="measurementMultipliersText"
-      class="q-mt-sm"
-      filled
-      label="Unit multipliers (unit:value)"
-      hint="Example: g:100, ml:100, serving:1"
-      @update:model-value="emit('update:measurementMultipliersText', String($event || ''))"
+      label="Supported measured units"
+      hint="Preset seeds common units. You can enable any supported unit."
+      use-chips
+      multiple
+      emit-value
+      map-options
+      :options="unitOptions"
+      @update:model-value="emit('update:measurementUnits', Array.isArray($event) ? $event : [])"
     />
   </div>
 </template>
 
 <script setup>
+import { computed } from 'vue'
+import { listEnabledUnits } from '../../utils/unitLibrary'
+
 defineProps({
   enabled: { type: Boolean, default: false },
   sectionsText: { type: String, default: 'Breakfast, Lunch, Dinner, Snacks' },
@@ -93,8 +92,7 @@ defineProps({
   description: { type: String, default: 'Optional offline diary that can fill calories into the daily log when you choose.' },
   toggleLabel: { type: String, default: 'Enable Food Diary' },
   measurementSystem: { type: String, default: 'metric' },
-  measurementUnitsText: { type: String, default: 'g, ml, serving' },
-  measurementMultipliersText: { type: String, default: 'g:100, ml:100, serving:1' },
+  measurementUnits: { type: Array, default: () => ['g', 'ml', 'serving'] },
   measurementSystemOptions: {
     type: Array,
     default: () => ([
@@ -109,12 +107,16 @@ const emit = defineEmits([
   'update:sectionsText',
   'update:sectionPercentage',
   'update:measurementSystem',
-  'update:measurementUnitsText',
-  'update:measurementMultipliersText'
+  'update:measurementUnits'
 ])
 
 function toNumberOrZero(value) {
   const numeric = Number(value)
   return Number.isFinite(numeric) ? numeric : 0
 }
+
+const unitOptions = computed(() => listEnabledUnits().map((unit) => ({
+  label: `${unit.label} (${unit.category})`,
+  value: unit.id
+})))
 </script>

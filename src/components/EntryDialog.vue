@@ -222,6 +222,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { QDialog, useQuasar } from 'quasar'
+import { convertAmountBetweenUnits, formatUnitLabel, getCanonicalDensitySuffixFromBasis, getUnitById, resolveUnitId } from '../utils/unitLibrary'
 
 const props = defineProps({
   modelValue: { type: Boolean, required: true },
@@ -234,7 +235,7 @@ const props = defineProps({
   enableSuggestionPicker: { type: Boolean, default: true },
   showMetadataFields: { type: Boolean, default: false },
   measurementUnits: { type: Array, default: () => ['g', 'ml', 'serving'] },
-  measurementUnitMultipliers: { type: Object, default: () => ({ g: 100, ml: 100, serving: 1 }) }
+  measurementUnitMultipliers: { type: Object, default: () => ({}) }
 })
 
 const emit = defineEmits(['update:modelValue', 'save', 'open-suggestion-picker'])
@@ -268,25 +269,20 @@ const showSectionSelect = computed(() => Array.isArray(props.sections) && props.
 
 const unitOptions = computed(() => {
   const list = Array.isArray(props.measurementUnits) ? props.measurementUnits : []
-  const normalized = [...new Set(list.map(unit => String(unit || '').trim().toLowerCase()).filter(Boolean))]
+  const normalized = [...new Set(list.map(resolveUnitId).filter(Boolean))]
   const fallback = ['g', 'ml', 'serving']
   const finalList = normalized.length > 0 ? normalized : fallback
-  return finalList.map(unit => ({ label: unit, value: unit }))
+  return finalList.map(unit => ({ label: formatUnitLabel(unit), value: unit }))
 })
 
+const densityBasisFromUnit = computed(() => (getUnitById(measuredUnit.value)?.category === 'volume' ? 'volume' : 'mass'))
+const selectedUnitCategory = computed(() => getUnitById(measuredUnit.value)?.category || 'mass')
+const selectedUnit = computed(() => getUnitById(measuredUnit.value))
+const isCanonicalDensityInputUnit = computed(() => measuredUnit.value === 'g' || measuredUnit.value === 'ml')
 const energySuffix = computed(() => {
-  const multiplier = unitMultiplier.value
-  if (multiplier === 100) return `kcal/100${measuredUnit.value}`
-  if (multiplier === 1) return `kcal/${measuredUnit.value}`
-  return `kcal/${multiplier}${measuredUnit.value}`
-})
-
-const unitMultiplier = computed(() => {
-  const fromConfig = Number(props.measurementUnitMultipliers?.[measuredUnit.value])
-  if (Number.isFinite(fromConfig) && fromConfig > 0) return fromConfig
-  // Backward fallback for legacy setups without explicit multipliers.
-  if (['g', 'ml', 'oz', 'fl oz'].includes(measuredUnit.value)) return 100
-  return 1
+  if (selectedUnitCategory.value === 'portion') return `kcal/${formatUnitLabel(measuredUnit.value)}`
+  if (!isCanonicalDensityInputUnit.value) return `kcal/${formatUnitLabel(measuredUnit.value)}`
+  return getCanonicalDensitySuffixFromBasis(densityBasisFromUnit.value)
 })
 
 const nameSuggestionMatches = computed(() => {
@@ -303,7 +299,13 @@ const computedTotalCalories = computed(() => {
     const amount = Number(measuredAmount.value)
     const energy = Number(measuredEnergy.value)
     if (!Number.isFinite(amount) || amount < 0 || !Number.isFinite(energy) || energy < 0) return 0
-    return Math.round((amount * energy) / unitMultiplier.value)
+    if (selectedUnitCategory.value === 'portion') return Math.round(amount * energy)
+    if (!isCanonicalDensityInputUnit.value) return Math.round(amount * energy)
+    const canonicalAmount = densityBasisFromUnit.value === 'volume'
+      ? convertAmountBetweenUnits(amount, measuredUnit.value, 'ml')
+      : convertAmountBetweenUnits(amount, measuredUnit.value, 'g')
+    if (!Number.isFinite(canonicalAmount)) return 0
+    return Math.round((canonicalAmount * energy) / 100)
   }
   const direct = Number(caloriesDirect.value)
   return Number.isFinite(direct) && direct >= 0 ? Math.round(direct) : 0
@@ -328,6 +330,9 @@ function defaultDraft() {
     amount: '',
     calories: 0,
     section: '',
+    densityMode: 'none',
+    densityBasis: 'mass',
+    densityKcalPer100Canonical: null,
     usePer100g: false,
     caloriesPer100g: null,
     notes: '',
@@ -341,7 +346,7 @@ function parseMeasuredAmount(item) {
   if (match) {
     return {
       amount: match[1],
-      unit: String(match[2] || '').trim().toLowerCase()
+      unit: resolveUnitId(match[2]) || ''
     }
   }
   return { amount: '', unit: '' }
@@ -354,8 +359,32 @@ function hasServingMetadata(item) {
 
 function resolveMode(item) {
   if (!item) return 'calories'
-  if (Boolean(item.usePer100g) || Number.isFinite(Number(item.caloriesPer100g)) || hasServingMetadata(item)) return 'measured'
+  const hasLegacyDensity = item.caloriesPer100g !== null
+    && item.caloriesPer100g !== undefined
+    && Number.isFinite(Number(item.caloriesPer100g))
+    && Number(item.caloriesPer100g) >= 0
+  if (item.densityMode === 'per100' || Boolean(item.usePer100g) || hasLegacyDensity || hasServingMetadata(item)) return 'measured'
   return 'calories'
+}
+
+function canonicalDensityToDisplayedEnergy(canonicalDensity) {
+  const value = Number(canonicalDensity)
+  if (!Number.isFinite(value) || value < 0) return null
+  if (selectedUnitCategory.value === 'portion') return value
+  if (isCanonicalDensityInputUnit.value) return value
+  const factor = Number(selectedUnit.value?.toBaseFactor)
+  if (!Number.isFinite(factor) || factor <= 0) return null
+  return (value * factor) / 100
+}
+
+function displayedEnergyToCanonicalDensity(displayedEnergy) {
+  const value = Number(displayedEnergy)
+  if (!Number.isFinite(value) || value < 0) return null
+  if (selectedUnitCategory.value === 'portion') return null
+  if (isCanonicalDensityInputUnit.value) return value
+  const factor = Number(selectedUnit.value?.toBaseFactor)
+  if (!Number.isFinite(factor) || factor <= 0) return null
+  return (value * 100) / factor
 }
 
 function initializeDraft(entry, defaultSection) {
@@ -365,6 +394,11 @@ function initializeDraft(entry, defaultSection) {
     amount: entry.amount || '',
     calories: Number(entry.calories) || 0,
     section: entry.section || defaultSection || '',
+    densityMode: entry.densityMode === 'per100' ? 'per100' : (entry.usePer100g ? 'per100' : 'none'),
+    densityBasis: entry.densityBasis === 'volume' ? 'volume' : 'mass',
+    densityKcalPer100Canonical: Number.isFinite(Number(entry.densityKcalPer100Canonical))
+      ? Number(entry.densityKcalPer100Canonical)
+      : (entry.caloriesPer100g !== null && entry.caloriesPer100g !== undefined && Number.isFinite(Number(entry.caloriesPer100g)) ? Number(entry.caloriesPer100g) : null),
     usePer100g: Boolean(entry.usePer100g),
     caloriesPer100g: entry.caloriesPer100g ?? null,
     notes: String(entry.notes || ''),
@@ -385,8 +419,8 @@ function initializeDraft(entry, defaultSection) {
     ? parsedMeasured.unit
     : availableUnits[0]
 
-  if (source.usePer100g) {
-    measuredEnergy.value = Number.isFinite(Number(source.caloriesPer100g)) ? Number(source.caloriesPer100g) : null
+  if (source.densityMode === 'per100') {
+    measuredEnergy.value = canonicalDensityToDisplayedEnergy(source.densityKcalPer100Canonical)
   } else if (parsedMeasured.amount && hasServingMetadata(source)) {
     const numericAmount = Number(parsedMeasured.amount)
     measuredEnergy.value = Number.isFinite(numericAmount) && numericAmount > 0
@@ -429,6 +463,11 @@ function applySuggestion(suggestion) {
     name: String(suggestion.name || '').trim(),
     amount: suggestion.amount || '',
     calories: Number(suggestion.calories) || 0,
+    densityMode: suggestion.densityMode === 'per100' ? 'per100' : (suggestion.usePer100g ? 'per100' : 'none'),
+    densityBasis: suggestion.densityBasis === 'volume' ? 'volume' : 'mass',
+    densityKcalPer100Canonical: Number.isFinite(Number(suggestion.densityKcalPer100Canonical))
+      ? Number(suggestion.densityKcalPer100Canonical)
+      : (suggestion.caloriesPer100g !== null && suggestion.caloriesPer100g !== undefined && Number.isFinite(Number(suggestion.caloriesPer100g)) ? Number(suggestion.caloriesPer100g) : null),
     usePer100g: Boolean(suggestion.usePer100g),
     caloriesPer100g: suggestion.caloriesPer100g ?? null,
     notes: String(suggestion.notes || ''),
@@ -441,8 +480,11 @@ function applySuggestion(suggestion) {
   if (parsedMeasured.unit && unitOptions.value.some(option => option.value === parsedMeasured.unit)) {
     measuredUnit.value = parsedMeasured.unit
   }
-  if (suggestion.usePer100g) {
-    measuredEnergy.value = Number.isFinite(Number(suggestion.caloriesPer100g)) ? Number(suggestion.caloriesPer100g) : null
+  if (suggestion.densityMode === 'per100' || suggestion.usePer100g) {
+    const fallbackCanonical = Number.isFinite(Number(suggestion.densityKcalPer100Canonical))
+      ? Number(suggestion.densityKcalPer100Canonical)
+      : (suggestion.caloriesPer100g !== null && suggestion.caloriesPer100g !== undefined && Number.isFinite(Number(suggestion.caloriesPer100g)) ? Number(suggestion.caloriesPer100g) : null)
+    measuredEnergy.value = canonicalDensityToDisplayedEnergy(fallbackCanonical)
   } else if (hasServingMetadata(suggestion) && Number(suggestion.calories) > 0 && Number(parsedMeasured.amount) > 0) {
     measuredEnergy.value = Math.round(Number(suggestion.calories) / Number(parsedMeasured.amount))
   } else {
@@ -492,13 +534,17 @@ function toPayload() {
   }
 
   if (logMode.value === 'measured') {
-    const isPer100Unit = Number(unitMultiplier.value) === 100
+    const isPer100Unit = getUnitById(measuredUnit.value)?.category !== 'portion'
+    const canonicalDensity = isPer100Unit ? displayedEnergyToCanonicalDensity(measuredEnergy.value) : null
     return {
       ...base,
       amount: `${Number(measuredAmount.value)} ${measuredUnit.value}`,
       calories: computedTotalCalories.value,
-      usePer100g: isPer100Unit,
-      caloriesPer100g: isPer100Unit ? Number(measuredEnergy.value) : null
+      densityMode: isPer100Unit ? 'per100' : 'none',
+      densityBasis: densityBasisFromUnit.value,
+      densityKcalPer100Canonical: canonicalDensity,
+      usePer100g: isPer100Unit && densityBasisFromUnit.value === 'mass',
+      caloriesPer100g: isPer100Unit && densityBasisFromUnit.value === 'mass' ? canonicalDensity : null
     }
   }
 
@@ -506,6 +552,9 @@ function toPayload() {
     ...base,
     amount: String(draft.value.amount || '').trim(),
     calories: computedTotalCalories.value,
+    densityMode: 'none',
+    densityBasis: 'mass',
+    densityKcalPer100Canonical: null,
     usePer100g: false,
     caloriesPer100g: null
   }
