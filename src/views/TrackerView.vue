@@ -472,63 +472,17 @@
       </q-card>
     </QDialog>
 
-    <div
-      class="text-h6 q-mb-sm"
-      data-tour="history-section"
-    >
-      History
-    </div>
-    <q-list
-      bordered
-      separator
-      class="bg-white rounded-borders"
-    >
-      <q-item
-        v-for="(log, idx) in displayedLogs"
-        :key="log.date"
-        :data-tour="idx === 0 ? 'history-row-first' : null"
-      >
-        <q-item-section
-          clickable
-          @click="jumpToDate(log.date)"
-        >
-          <q-item-label>{{ formatDate(log.date) }}</q-item-label>
-        </q-item-section>
-        <q-item-section
-          side
-          clickable
-          @click="jumpToDate(log.date)"
-        >
-          <div class="text-right">
-            <div>{{ formatBodyWeight(log.weight) }}</div>
-            <div class="text-caption">
-              {{ log.calories }} kcal
-            </div>
-          </div>
-        </q-item-section>
-        <q-item-section side>
-          <q-btn
-            :data-tour="idx === 0 ? 'history-delete-first' : null"
-            flat
-            round
-            dense
-            icon="delete"
-            color="negative"
-            aria-label="Delete entry"
-            @click.stop="confirmDelete(log)"
-          />
-        </q-item-section>
-      </q-item>
-      <q-item
-        v-if="canLoadMore"
-        clickable
-        @click="loadMore"
-      >
-        <q-item-section class="text-center text-primary">
-          <q-item-label>Load More</q-item-label>
-        </q-item-section>
-      </q-item>
-    </q-list>
+    <HistorySection
+      v-model="historyViewMode"
+      :logs="allLogs"
+      :selected-date="selectedDate"
+      :format-date="formatDate"
+      :format-body-weight="formatBodyWeight"
+      :tour-mock-entry="mockHistoryEntry"
+      :is-tour-mock-mode="isTourMockMode"
+      @select-date="jumpToDate"
+      @delete-date="confirmDelete"
+    />
   </q-page>
 </template>
 
@@ -540,6 +494,7 @@ import { date as qDate, useQuasar } from 'quasar'
 import { QDate, QDialog } from 'quasar'
 import CalorieBudgetBar from '../components/CalorieBudgetBar.vue'
 import EntryDialog from '../components/EntryDialog.vue'
+import HistorySection from '../components/tracker/HistorySection.vue'
 import { addDays, parseDateKey, todayKey } from '../utils/dateKey'
 import { calculateDailyCalorieAdjustment, computeCalorieTarget } from '../utils/tdee'
 import { convertWeeklyRateKg, formatWeightFromKg, kgToLb, lbToKg } from '../utils/bodyUnits'
@@ -565,7 +520,6 @@ const trackerEntrySection = ref('')
 
 const currentWeight = ref(null)
 const currentCalories = ref(null)
-const historyLimit = ref(14)
 const isDiarySummaryCollapsed = ref(true)
 const isTourMockMode = computed(() => route.query.tourMock === '1')
 const SEVEN_DAY_DELTA_WARNING_DISMISS_KEY = 'tdee_tracker_seven_day_delta_warning_dismissed_until'
@@ -581,6 +535,12 @@ const nextDayDate = computed(() => {
 
 const profileMeasurementSystem = computed(() => store.profileMeasurementSystem || 'metric')
 const bodyWeightUnitLabel = computed(() => profileMeasurementSystem.value === 'imperial' ? 'lb' : 'kg')
+const historyViewMode = computed({
+  get: () => (store.historyViewMode === 'grid' ? 'grid' : 'list'),
+  set: (value) => {
+    store.historyViewMode = value === 'grid' ? 'grid' : 'list'
+  }
+})
 
 function formatBodyWeight(weightKg, digits = 1) {
   return formatWeightFromKg(weightKg, profileMeasurementSystem.value, digits)
@@ -624,13 +584,6 @@ const mockHistoryEntry = computed(() => {
   }
 })
 
-const displayedLogs = computed(() => {
-  const realLogs = allLogs.value.slice(0, historyLimit.value)
-  if (realLogs.length === 0 && isTourMockMode.value) return [mockHistoryEntry.value]
-  return realLogs
-})
-
-const canLoadMore = computed(() => allLogs.value.length > historyLimit.value)
 
 const dayDiaryEntries = computed(() => store.foodDiaryEntries
   .filter(entry => entry.date === selectedDate.value)
@@ -956,10 +909,6 @@ const tdeeConfidenceHint = computed(() => {
   }
   return ''
 })
-
-function loadMore() {
-  historyLimit.value += 7
-}
 
 function previousDay() {
   transitionName.value = 'slide-right'

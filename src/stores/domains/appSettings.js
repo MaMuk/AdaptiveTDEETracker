@@ -6,6 +6,7 @@ import { getPresetUnits, getPrimaryPresetUnits, resolveUnitId } from '../../util
 const STORAGE_KEY = 'tdee_app_settings_store'
 const ACTIVITY_LEVELS = ['very_low', 'low', 'moderate', 'high', 'very_high']
 const MEASUREMENT_SYSTEMS = ['metric', 'imperial']
+const HISTORY_VIEW_MODES = ['list', 'grid']
 
 const DEFAULT_SUGGESTIONS_VISIBLE_COLUMNS = {
     name: true,
@@ -63,6 +64,9 @@ function sanitizeAppSettings(value) {
     const multiplierFallback = {}
     const measurementUnits = sanitizeMeasurementUnits(source.measurementUnits, unitFallback)
     const measurementUnitMultipliers = sanitizeUnitMultipliers(source.measurementUnitMultipliers, multiplierFallback)
+    const historyViewMode = HISTORY_VIEW_MODES.includes(source.historyViewMode)
+        ? source.historyViewMode
+        : 'list'
     return {
         suggestionsVisibleColumns: sanitizeSuggestionsVisibleColumns(source.suggestionsVisibleColumns),
         tdeeManualBias: Number.isFinite(tdeeManualBias)
@@ -76,7 +80,8 @@ function sanitizeAppSettings(value) {
         profileMeasurementSystem,
         measurementSystem,
         measurementUnits,
-        measurementUnitMultipliers
+        measurementUnitMultipliers,
+        historyViewMode
     }
 }
 
@@ -174,6 +179,13 @@ export const useAppSettingsStore = defineStore('appSettings', () => {
         }
     }
 
+    function setHistoryViewMode(value) {
+        appSettings.value = {
+            ...appSettings.value,
+            historyViewMode: HISTORY_VIEW_MODES.includes(value) ? value : 'list'
+        }
+    }
+
     function resetAppSettings() {
         appSettings.value = sanitizeAppSettings({
             setupCompleted: false,
@@ -209,6 +221,7 @@ export const useAppSettingsStore = defineStore('appSettings', () => {
         setMeasurementSystem,
         setMeasurementUnits,
         setMeasurementUnitMultipliers,
+        setHistoryViewMode,
         resetAppSettings
     }
 })

@@ -149,6 +149,10 @@ export const useUserStore = defineStore('user', () => {
         get: () => appSettingsStore.appSettings.measurementUnitMultipliers,
         set: (v) => { appSettingsStore.setMeasurementUnitMultipliers(v) }
     })
+    const historyViewMode = computed({
+        get: () => appSettingsStore.appSettings.historyViewMode,
+        set: (v) => { appSettingsStore.setHistoryViewMode(v) }
+    })
 
     function resetAll() {
         profileStore.resetProfileLogsTdee()
@@ -199,6 +203,7 @@ export const useUserStore = defineStore('user', () => {
         profileMeasurementSystem,
         measurementUnits,
         measurementUnitMultipliers,
+        historyViewMode,
         addLog: profileStore.addLog,
         deleteLog: profileStore.deleteLog,
         updateTDEE: profileStore.updateTDEE,
@@ -223,6 +228,7 @@ export const useUserStore = defineStore('user', () => {
         setMeasurementSystem: appSettingsStore.setMeasurementSystem,
         setMeasurementUnits: appSettingsStore.setMeasurementUnits,
         setMeasurementUnitMultipliers: appSettingsStore.setMeasurementUnitMultipliers,
+        setHistoryViewMode: appSettingsStore.setHistoryViewMode,
         addDiaryEntry: diaryStore.addDiaryEntry,
         updateDiaryEntry: diaryStore.updateDiaryEntry,
         deleteDiaryEntry: diaryStore.deleteDiaryEntry,

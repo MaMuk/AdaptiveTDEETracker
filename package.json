@@ -1,13 +1,14 @@
 {
   "name": "adaptive-tdee-tracker",
   "private": true,
-  "version": "1.1.0",
+  "version": "1.1.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "build:android": "node scripts/build-android.js",
     "build:android:release": "node scripts/build-android.js --release",
+    "export:sheet-csv": "node scripts/export-log-csv.js",
     "preview": "vite preview",
     "test:tdee": "node src/utils/tdee.test.js",
     "test:body-units": "node src/utils/bodyUnits.test.js",
