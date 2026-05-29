@@ -8,6 +8,7 @@ const DEFAULT_SECTIONS = ['Breakfast', 'Lunch', 'Dinner', 'Snacks']
 
 export const useDiaryStore = defineStore('diary', () => {
     const foodDiaryEnabled = ref(false)
+    const diaryMacroTrackingEnabled = ref(false)
     const diarySections = ref([...DEFAULT_SECTIONS])
     const diarySectionPercentages = ref({})
     const foodDiaryEntries = ref([])
@@ -112,6 +113,10 @@ export const useDiaryStore = defineStore('diary', () => {
         foodDiaryEnabled.value = Boolean(enabled)
     }
 
+    function setDiaryMacroTrackingEnabled(enabled) {
+        diaryMacroTrackingEnabled.value = Boolean(enabled)
+    }
+
     function setDiarySections(sections) {
         const sanitized = sections
             .map(section => String(section || '').trim())
@@ -179,6 +184,7 @@ export const useDiaryStore = defineStore('diary', () => {
             amount: entry.amount || '',
             calories: Number(entry.calories),
             section: entry.section || '',
+            ...normalizeMacroFields(entry),
             ...normalizeDensityFields(entry)
         }
         foodDiaryEntries.value.push(withLegacyDensityFields(normalized))
@@ -194,6 +200,10 @@ export const useDiaryStore = defineStore('diary', () => {
             ...updates,
             calories: Number(updates.calories ?? foodDiaryEntries.value[index].calories),
             section: updates.section ?? foodDiaryEntries.value[index].section ?? '',
+            ...normalizeMacroFields({
+                ...foodDiaryEntries.value[index],
+                ...updates
+            }),
             ...normalizeDensityFields({
                 ...foodDiaryEntries.value[index],
                 ...updates
@@ -228,6 +238,7 @@ export const useDiaryStore = defineStore('diary', () => {
 
     function resetDiary() {
         foodDiaryEnabled.value = false
+        diaryMacroTrackingEnabled.value = false
         diarySections.value = [...DEFAULT_SECTIONS]
         diarySectionPercentages.value = defaultSectionPercentages(diarySections.value)
         foodDiaryEntries.value = []
@@ -239,11 +250,15 @@ export const useDiaryStore = defineStore('diary', () => {
         const stored = JSON.parse(localStorage.getItem(STORAGE_KEY))
         if (stored) {
             foodDiaryEnabled.value = Boolean(stored.foodDiaryEnabled)
+            diaryMacroTrackingEnabled.value = Boolean(stored.diaryMacroTrackingEnabled)
             diarySections.value = Array.isArray(stored.diarySections) && stored.diarySections.length > 0
                 ? stored.diarySections
                 : [...DEFAULT_SECTIONS]
             foodDiaryEntries.value = Array.isArray(stored.foodDiaryEntries)
-                ? stored.foodDiaryEntries.map(entry => withLegacyDensityFields(entry))
+                ? stored.foodDiaryEntries.map(entry => ({
+                    ...withLegacyDensityFields(entry),
+                    ...normalizeMacroFields(entry)
+                }))
                 : []
             const legacySections = getLegacyDiarySections(foodDiaryEntries.value, diarySections.value)
             diarySectionPercentages.value = sanitizeSectionPercentages(stored.diarySectionPercentages, diarySections.value, legacySections)
@@ -256,9 +271,10 @@ export const useDiaryStore = defineStore('diary', () => {
         diarySectionPercentages.value = defaultSectionPercentages(diarySections.value)
     }
 
-    watch([foodDiaryEnabled, diarySections, diarySectionPercentages, foodDiaryEntries, diaryClosedSectionsByDate, diaryBudgetSnapshotsByDate], () => {
+    watch([foodDiaryEnabled, diaryMacroTrackingEnabled, diarySections, diarySectionPercentages, foodDiaryEntries, diaryClosedSectionsByDate, diaryBudgetSnapshotsByDate], () => {
         localStorage.setItem(STORAGE_KEY, JSON.stringify({
             foodDiaryEnabled: foodDiaryEnabled.value,
+            diaryMacroTrackingEnabled: diaryMacroTrackingEnabled.value,
             diarySections: diarySections.value,
             diarySectionPercentages: diarySectionPercentages.value,
             foodDiaryEntries: foodDiaryEntries.value,
@@ -269,6 +285,7 @@ export const useDiaryStore = defineStore('diary', () => {
 
     return {
         foodDiaryEnabled,
+        diaryMacroTrackingEnabled,
         diarySections,
         diarySectionPercentages,
         foodDiaryEntries,
@@ -281,6 +298,7 @@ export const useDiaryStore = defineStore('diary', () => {
         getAllKnownDiarySections,
         getDiarySectionsForDate,
         setFoodDiaryEnabled,
+        setDiaryMacroTrackingEnabled,
         setDiarySections,
         setDiarySectionPercentage,
         setDiaryClosedSectionsForDate,
@@ -293,6 +311,20 @@ export const useDiaryStore = defineStore('diary', () => {
         getDiaryEntriesByDateAndSection,
         sumDiaryCaloriesByDate,
         sumDiaryCaloriesByDateAndSection,
+        normalizeMacroFields,
         resetDiary
     }
 })
+    function normalizeMacroValue(value) {
+        if (value === null || value === undefined || value === '') return null
+        const numeric = Number(value)
+        return Number.isFinite(numeric) && numeric >= 0 ? Math.round(numeric * 10) / 10 : null
+    }
+
+    function normalizeMacroFields(entry) {
+        return {
+            protein: normalizeMacroValue(entry?.protein),
+            carbohydrates: normalizeMacroValue(entry?.carbohydrates),
+            fat: normalizeMacroValue(entry?.fat)
+        }
+    }

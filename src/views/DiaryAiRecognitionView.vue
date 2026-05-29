@@ -205,6 +205,42 @@
           class="q-mb-sm"
         />
 
+        <div
+          v-if="store.diaryMacroTrackingEnabled"
+          class="row q-col-gutter-sm q-mb-sm"
+        >
+          <div class="col-12 col-sm-4">
+            <q-input
+              v-model.number="draftProtein"
+              type="number"
+              min="0"
+              step="0.1"
+              filled
+              label="Protein (g)"
+            />
+          </div>
+          <div class="col-12 col-sm-4">
+            <q-input
+              v-model.number="draftCarbohydrates"
+              type="number"
+              min="0"
+              step="0.1"
+              filled
+              label="Carbohydrates (g)"
+            />
+          </div>
+          <div class="col-12 col-sm-4">
+            <q-input
+              v-model.number="draftFat"
+              type="number"
+              min="0"
+              step="0.1"
+              filled
+              label="Fat (g)"
+            />
+          </div>
+        </div>
+
         <q-btn
           color="positive"
           label="Save to Diary"
@@ -233,6 +269,9 @@ const guesses = ref([])
 const selectedGuessIndex = ref(0)
 const draftName = ref('')
 const draftCalories = ref(0)
+const draftProtein = ref(null)
+const draftCarbohydrates = ref(null)
+const draftFat = ref(null)
 const draftSection = ref('')
 const isRecognizing = ref(false)
 const errorMessage = ref('')
@@ -300,6 +339,9 @@ function clearFlow() {
   selectedGuessIndex.value = 0
   draftName.value = ''
   draftCalories.value = 0
+  draftProtein.value = null
+  draftCarbohydrates.value = null
+  draftFat.value = null
   warningMessage.value = ''
   demoMessage.value = ''
   errorMessage.value = ''
@@ -364,6 +406,9 @@ function selectGuess(index) {
 
   draftName.value = guess.name
   draftCalories.value = Number(guess.calories.estimate) || 0
+  draftProtein.value = toNullableMacro(guess.protein)
+  draftCarbohydrates.value = toNullableMacro(guess.carbohydrates)
+  draftFat.value = toNullableMacro(guess.fat)
 
   if (guess.confidence === 'low') {
     warningMessage.value = 'Low confidence result. Review and edit carefully before saving.'
@@ -393,6 +438,9 @@ function saveToDiary() {
     amount: '',
     calories: Math.round(calories),
     section: draftSection.value,
+    protein: toNullableMacro(draftProtein.value),
+    carbohydrates: toNullableMacro(draftCarbohydrates.value),
+    fat: toNullableMacro(draftFat.value),
     usePer100g: false,
     caloriesPer100g: null
   })
@@ -408,5 +456,11 @@ function saveToDiary() {
 function goBack() {
   clearFlow()
   router.push({ path: '/diary', query: { date: selectedDate.value } })
+}
+
+function toNullableMacro(value) {
+  if (value === null || value === undefined || value === '') return null
+  const numeric = Number(value)
+  return Number.isFinite(numeric) && numeric >= 0 ? numeric : null
 }
 </script>

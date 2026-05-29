@@ -6,7 +6,7 @@ import { useSuggestionsStore } from './suggestions'
 import { useAiSettingsStore } from './aiSettings'
 import { useAppSettingsStore } from './appSettings'
 
-const EXPORT_SCHEMA_VERSION = 6
+const EXPORT_SCHEMA_VERSION = 7
 const EXPORT_SECTION_KEYS = ['profile', 'logs', 'foodDiary', 'foodSuggestions', 'appSettings']
 
 export const useDataTransferStore = defineStore('dataTransfer', () => {
@@ -55,6 +55,9 @@ export const useDataTransferStore = defineStore('dataTransfer', () => {
                 amount: entry.amount || '',
                 calories: Number(entry.calories),
                 section: entry.section || '',
+                protein: diaryStore.normalizeMacroFields(entry).protein,
+                carbohydrates: diaryStore.normalizeMacroFields(entry).carbohydrates,
+                fat: diaryStore.normalizeMacroFields(entry).fat,
                 densityMode: entry.densityMode === 'per100' ? 'per100' : 'none',
                 densityBasis: entry.densityBasis === 'volume' ? 'volume' : 'mass',
                 densityKcalPer100Canonical: Number.isFinite(Number(entry.densityKcalPer100Canonical))
@@ -63,6 +66,7 @@ export const useDataTransferStore = defineStore('dataTransfer', () => {
             }))
             payload.sections.foodDiary = {
                 foodDiaryEnabled: Boolean(diaryStore.foodDiaryEnabled),
+                diaryMacroTrackingEnabled: Boolean(diaryStore.diaryMacroTrackingEnabled),
                 diarySections: Array.isArray(diaryStore.diarySections) ? [...diaryStore.diarySections] : ['Breakfast', 'Lunch', 'Dinner', 'Snacks'],
                 diarySectionPercentages: { ...(diaryStore.diarySectionPercentages || {}) },
                 foodDiaryEntries: normalizedEntries,
@@ -73,6 +77,9 @@ export const useDataTransferStore = defineStore('dataTransfer', () => {
         if (selected.includes('foodSuggestions')) {
             const normalizedSuggestions = (Array.isArray(suggestionsStore.foodSuggestions) ? suggestionsStore.foodSuggestions : []).map((item) => ({
                 ...item,
+                protein: Number.isFinite(Number(item?.protein)) ? Number(item.protein) : null,
+                carbohydrates: Number.isFinite(Number(item?.carbohydrates)) ? Number(item.carbohydrates) : null,
+                fat: Number.isFinite(Number(item?.fat)) ? Number(item.fat) : null,
                 densityMode: item.densityMode === 'per100' ? 'per100' : 'none',
                 densityBasis: item.densityBasis === 'volume' ? 'volume' : 'mass',
                 densityKcalPer100Canonical: Number.isFinite(Number(item.densityKcalPer100Canonical))
@@ -126,10 +133,16 @@ export const useDataTransferStore = defineStore('dataTransfer', () => {
 
         if (selected.includes('foodDiary') && sourceSections.foodDiary && typeof sourceSections.foodDiary === 'object') {
             diaryStore.foodDiaryEnabled = Boolean(sourceSections.foodDiary.foodDiaryEnabled)
+            diaryStore.diaryMacroTrackingEnabled = Boolean(sourceSections.foodDiary.diaryMacroTrackingEnabled)
             diaryStore.diarySections = Array.isArray(sourceSections.foodDiary.diarySections) && sourceSections.foodDiary.diarySections.length > 0
                 ? [...new Set(sourceSections.foodDiary.diarySections.map(section => String(section || '').trim()).filter(Boolean))]
                 : ['Breakfast', 'Lunch', 'Dinner', 'Snacks']
-            diaryStore.foodDiaryEntries = Array.isArray(sourceSections.foodDiary.foodDiaryEntries) ? [...sourceSections.foodDiary.foodDiaryEntries] : []
+            diaryStore.foodDiaryEntries = Array.isArray(sourceSections.foodDiary.foodDiaryEntries)
+                ? sourceSections.foodDiary.foodDiaryEntries.map((entry) => ({
+                    ...entry,
+                    ...diaryStore.normalizeMacroFields(entry)
+                }))
+                : []
             const legacySections = diaryStore.getLegacyDiarySections(diaryStore.foodDiaryEntries, diaryStore.diarySections)
             diaryStore.diarySectionPercentages = diaryStore.sanitizeSectionPercentages(sourceSections.foodDiary.diarySectionPercentages, diaryStore.diarySections, legacySections)
             diaryStore.diaryClosedSectionsByDate = diaryStore.sanitizeClosedSectionsByDate(sourceSections.foodDiary.diaryClosedSectionsByDate, diaryStore.diarySections, legacySections)

@@ -443,6 +443,7 @@
       :suggestions="store.foodSuggestions"
       :measurement-units="store.measurementUnits"
       :measurement-unit-multipliers="store.measurementUnitMultipliers"
+      :show-macro-fields="store.diaryMacroTrackingEnabled"
       @save="saveTrackerEntry"
       @open-suggestion-picker="openDiaryForSection($event)"
     />
@@ -976,9 +977,18 @@ function saveTrackerEntry(payload) {
     amount: String(payload.amount || '').trim(),
     calories: Number(payload.calories) || 0,
     section: payload.section || '',
+    protein: toNullableMacro(payload.protein),
+    carbohydrates: toNullableMacro(payload.carbohydrates),
+    fat: toNullableMacro(payload.fat),
     usePer100g: Boolean(payload.usePer100g),
     caloriesPer100g: payload.usePer100g ? Number(payload.caloriesPer100g) : null
   }, { syncSuggestion: true })
+}
+
+function toNullableMacro(value) {
+  if (value === null || value === undefined || value === '') return null
+  const numeric = Number(value)
+  return Number.isFinite(numeric) && numeric >= 0 ? numeric : null
 }
 
 function commitDiaryToDailyLog() {

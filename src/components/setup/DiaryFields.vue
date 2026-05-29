@@ -18,6 +18,14 @@
     hint="Example: Breakfast, Lunch, Dinner, Snacks"
     @update:model-value="emit('update:sectionsText', String($event || ''))"
   />
+  <q-toggle
+    v-if="enabled"
+    class="q-mt-sm"
+    :model-value="macroTrackingEnabled"
+    label="Track macronutrients (protein, carbohydrates, fat)"
+    color="primary"
+    @update:model-value="emit('update:macroTrackingEnabled', Boolean($event))"
+  />
   <div
     v-if="enabled"
     class="q-mt-md"
@@ -93,6 +101,7 @@ defineProps({
   toggleLabel: { type: String, default: 'Enable Food Diary' },
   measurementSystem: { type: String, default: 'metric' },
   measurementUnits: { type: Array, default: () => ['g', 'ml', 'serving'] },
+  macroTrackingEnabled: { type: Boolean, default: false },
   measurementSystemOptions: {
     type: Array,
     default: () => ([
@@ -107,7 +116,8 @@ const emit = defineEmits([
   'update:sectionsText',
   'update:sectionPercentage',
   'update:measurementSystem',
-  'update:measurementUnits'
+  'update:measurementUnits',
+  'update:macroTrackingEnabled'
 ])
 
 function toNumberOrZero(value) {

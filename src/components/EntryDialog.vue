@@ -157,6 +157,45 @@
             />
           </div>
 
+          <template v-if="showMacroFields">
+            <div class="col-12 col-sm-4">
+              <q-input
+                v-model.number="proteinInput"
+                dense
+                filled
+                type="number"
+                min="0"
+                step="0.1"
+                label="Protein"
+                :suffix="macroInputSuffix"
+              />
+            </div>
+            <div class="col-12 col-sm-4">
+              <q-input
+                v-model.number="carbohydratesInput"
+                dense
+                filled
+                type="number"
+                min="0"
+                step="0.1"
+                label="Carbohydrates"
+                :suffix="macroInputSuffix"
+              />
+            </div>
+            <div class="col-12 col-sm-4">
+              <q-input
+                v-model.number="fatInput"
+                dense
+                filled
+                type="number"
+                min="0"
+                step="0.1"
+                label="Fat"
+                :suffix="macroInputSuffix"
+              />
+            </div>
+          </template>
+
           <div
             v-if="showMetadataFields"
             class="col-12"
@@ -172,11 +211,29 @@
           </div>
 
           <div class="col-12">
-            <div class="text-caption text-grey-7">
-              Total
-            </div>
-            <div class="text-subtitle2">
-              {{ computedTotalCalories }} kcal
+            <div class="nutrition-summary">
+              <div class="nutrition-title">
+                Nutrition Summary
+              </div>
+              <div class="nutrition-rule nutrition-rule-thick" />
+              <div class="nutrition-row nutrition-row-main">
+                <span>Calories</span>
+                <strong>{{ computedTotalCalories }} kcal</strong>
+              </div>
+              <div class="nutrition-rule nutrition-rule-medium" />
+              <div class="nutrition-row">
+                <span>Protein</span>
+                <span>{{ formatMacroForSummary(computedTotalProtein) }}</span>
+              </div>
+              <div class="nutrition-row">
+                <span>Carbohydrates</span>
+                <span>{{ formatMacroForSummary(computedTotalCarbohydrates) }}</span>
+              </div>
+              <div class="nutrition-row">
+                <span>Fat</span>
+                <span>{{ formatMacroForSummary(computedTotalFat) }}</span>
+              </div>
+              <div class="nutrition-rule nutrition-rule-thick" />
             </div>
           </div>
 
@@ -234,6 +291,7 @@ const props = defineProps({
   saveLabel: { type: String, default: 'Save' },
   enableSuggestionPicker: { type: Boolean, default: true },
   showMetadataFields: { type: Boolean, default: false },
+  showMacroFields: { type: Boolean, default: false },
   measurementUnits: { type: Array, default: () => ['g', 'ml', 'serving'] },
   measurementUnitMultipliers: { type: Object, default: () => ({}) }
 })
@@ -254,6 +312,9 @@ const measuredAmount = ref('')
 const measuredUnit = ref('g')
 const measuredEnergy = ref(null)
 const caloriesDirect = ref(null)
+const proteinInput = ref(null)
+const carbohydratesInput = ref(null)
+const fatInput = ref(null)
 
 const open = computed({
   get: () => props.modelValue,
@@ -284,6 +345,12 @@ const energySuffix = computed(() => {
   if (!isCanonicalDensityInputUnit.value) return `kcal/${formatUnitLabel(measuredUnit.value)}`
   return getCanonicalDensitySuffixFromBasis(densityBasisFromUnit.value)
 })
+const macroInputSuffix = computed(() => {
+  if (logMode.value === 'calories') return 'g'
+  if (selectedUnitCategory.value === 'portion') return `g/${formatUnitLabel(measuredUnit.value)}`
+  if (!isCanonicalDensityInputUnit.value) return `g/${formatUnitLabel(measuredUnit.value)}`
+  return densityBasisFromUnit.value === 'volume' ? 'g/100ml' : 'g/100g'
+})
 
 const nameSuggestionMatches = computed(() => {
   const query = String(draft.value.name || '').trim().toLowerCase()
@@ -310,12 +377,18 @@ const computedTotalCalories = computed(() => {
   const direct = Number(caloriesDirect.value)
   return Number.isFinite(direct) && direct >= 0 ? Math.round(direct) : 0
 })
+const computedTotalProtein = computed(() => computeMacroTotalForDisplay(proteinInput.value))
+const computedTotalCarbohydrates = computed(() => computeMacroTotalForDisplay(carbohydratesInput.value))
+const computedTotalFat = computed(() => computeMacroTotalForDisplay(fatInput.value))
 
 const isDraftDirty = computed(() => {
   return JSON.stringify(draft.value) !== JSON.stringify(initialDraft.value)
     || logMode.value !== resolveMode(initialDraft.value)
     || measuredAmount.value !== parseMeasuredAmount(initialDraft.value).amount
     || measuredUnit.value !== parseMeasuredAmount(initialDraft.value).unit
+    || proteinInput.value !== deriveMacroInputFromEntry(initialDraft.value, 'protein')
+    || carbohydratesInput.value !== deriveMacroInputFromEntry(initialDraft.value, 'carbohydrates')
+    || fatInput.value !== deriveMacroInputFromEntry(initialDraft.value, 'fat')
 })
 
 watch(() => props.modelValue, (isOpen) => {
@@ -335,6 +408,9 @@ function defaultDraft() {
     densityKcalPer100Canonical: null,
     usePer100g: false,
     caloriesPer100g: null,
+    protein: null,
+    carbohydrates: null,
+    fat: null,
     notes: '',
     tagsCsv: ''
   }
@@ -401,6 +477,9 @@ function initializeDraft(entry, defaultSection) {
       : (entry.caloriesPer100g !== null && entry.caloriesPer100g !== undefined && Number.isFinite(Number(entry.caloriesPer100g)) ? Number(entry.caloriesPer100g) : null),
     usePer100g: Boolean(entry.usePer100g),
     caloriesPer100g: entry.caloriesPer100g ?? null,
+    protein: Number.isFinite(Number(entry.protein)) ? Number(entry.protein) : null,
+    carbohydrates: Number.isFinite(Number(entry.carbohydrates)) ? Number(entry.carbohydrates) : null,
+    fat: Number.isFinite(Number(entry.fat)) ? Number(entry.fat) : null,
     notes: String(entry.notes || ''),
     tagsCsv: String(entry.tagsCsv || (Array.isArray(entry.tags) ? entry.tags.join(', ') : ''))
   } : {
@@ -431,6 +510,15 @@ function initializeDraft(entry, defaultSection) {
   }
 
   caloriesDirect.value = Number(source.calories) || 0
+  proteinInput.value = logMode.value === 'measured'
+    ? deriveMacroInputFromEntry(source, 'protein')
+    : (Number.isFinite(Number(source.protein)) ? Number(source.protein) : null)
+  carbohydratesInput.value = logMode.value === 'measured'
+    ? deriveMacroInputFromEntry(source, 'carbohydrates')
+    : (Number.isFinite(Number(source.carbohydrates)) ? Number(source.carbohydrates) : null)
+  fatInput.value = logMode.value === 'measured'
+    ? deriveMacroInputFromEntry(source, 'fat')
+    : (Number.isFinite(Number(source.fat)) ? Number(source.fat) : null)
   showNameSuggestions.value = false
 }
 
@@ -470,6 +558,9 @@ function applySuggestion(suggestion) {
       : (suggestion.caloriesPer100g !== null && suggestion.caloriesPer100g !== undefined && Number.isFinite(Number(suggestion.caloriesPer100g)) ? Number(suggestion.caloriesPer100g) : null),
     usePer100g: Boolean(suggestion.usePer100g),
     caloriesPer100g: suggestion.caloriesPer100g ?? null,
+    protein: Number.isFinite(Number(suggestion.protein)) ? Number(suggestion.protein) : null,
+    carbohydrates: Number.isFinite(Number(suggestion.carbohydrates)) ? Number(suggestion.carbohydrates) : null,
+    fat: Number.isFinite(Number(suggestion.fat)) ? Number(suggestion.fat) : null,
     notes: String(suggestion.notes || ''),
     tagsCsv: String(suggestion.tagsCsv || (Array.isArray(suggestion.tags) ? suggestion.tags.join(', ') : '')),
     section: draft.value.section || props.defaultSection || ''
@@ -491,6 +582,15 @@ function applySuggestion(suggestion) {
     measuredEnergy.value = null
   }
   caloriesDirect.value = Number(suggestion.calories) || 0
+  proteinInput.value = logMode.value === 'measured'
+    ? deriveMacroInputFromEntry(suggestion, 'protein')
+    : (Number.isFinite(Number(suggestion.protein)) ? Number(suggestion.protein) : null)
+  carbohydratesInput.value = logMode.value === 'measured'
+    ? deriveMacroInputFromEntry(suggestion, 'carbohydrates')
+    : (Number.isFinite(Number(suggestion.carbohydrates)) ? Number(suggestion.carbohydrates) : null)
+  fatInput.value = logMode.value === 'measured'
+    ? deriveMacroInputFromEntry(suggestion, 'fat')
+    : (Number.isFinite(Number(suggestion.fat)) ? Number(suggestion.fat) : null)
 }
 
 function validateDraft() {
@@ -525,10 +625,16 @@ function validateDraft() {
 }
 
 function toPayload() {
+  const protein = Number(logMode.value === 'measured' ? computeMacroTotalFromMeasured(proteinInput.value) : proteinInput.value)
+  const carbohydrates = Number(logMode.value === 'measured' ? computeMacroTotalFromMeasured(carbohydratesInput.value) : carbohydratesInput.value)
+  const fat = Number(logMode.value === 'measured' ? computeMacroTotalFromMeasured(fatInput.value) : fatInput.value)
   const base = {
     id: draft.value.id,
     name: String(draft.value.name || '').trim(),
     section: draft.value.section || '',
+    protein: Number.isFinite(protein) && protein >= 0 ? Math.round(protein * 10) / 10 : null,
+    carbohydrates: Number.isFinite(carbohydrates) && carbohydrates >= 0 ? Math.round(carbohydrates * 10) / 10 : null,
+    fat: Number.isFinite(fat) && fat >= 0 ? Math.round(fat * 10) / 10 : null,
     notes: String(draft.value.notes || '').trim(),
     tagsCsv: String(draft.value.tagsCsv || '').trim()
   }
@@ -558,6 +664,49 @@ function toPayload() {
     usePer100g: false,
     caloriesPer100g: null
   }
+}
+
+function computeMacroTotalFromMeasured(densityValue) {
+  const amount = Number(measuredAmount.value)
+  const density = Number(densityValue)
+  if (!Number.isFinite(amount) || amount < 0 || !Number.isFinite(density) || density < 0) return null
+  if (selectedUnitCategory.value === 'portion') return Math.round(amount * density * 10) / 10
+  if (!isCanonicalDensityInputUnit.value) return Math.round(amount * density * 10) / 10
+  const canonicalAmount = densityBasisFromUnit.value === 'volume'
+    ? convertAmountBetweenUnits(amount, measuredUnit.value, 'ml')
+    : convertAmountBetweenUnits(amount, measuredUnit.value, 'g')
+  if (!Number.isFinite(canonicalAmount)) return null
+  return Math.round(((canonicalAmount * density) / 100) * 10) / 10
+}
+
+function computeMacroTotalForDisplay(value) {
+  if (!props.showMacroFields) return null
+  if (logMode.value === 'measured') return computeMacroTotalFromMeasured(value)
+  const numeric = Number(value)
+  return Number.isFinite(numeric) && numeric >= 0 ? Math.round(numeric * 10) / 10 : null
+}
+
+function deriveMacroInputFromEntry(entry, key) {
+  const total = Number(entry?.[key])
+  if (!Number.isFinite(total) || total < 0) return null
+  const parsedMeasured = parseMeasuredAmount(entry)
+  const amount = Number(parsedMeasured.amount)
+  if (!Number.isFinite(amount) || amount <= 0) return null
+  const unit = resolveUnitId(parsedMeasured.unit)
+  const category = getUnitById(unit)?.category || 'mass'
+  if (category === 'portion') return Math.round((total / amount) * 10) / 10
+  if (unit !== 'g' && unit !== 'ml') return Math.round((total / amount) * 10) / 10
+  const canonicalAmount = unit === 'ml'
+    ? convertAmountBetweenUnits(amount, unit, 'ml')
+    : convertAmountBetweenUnits(amount, unit, 'g')
+  if (!Number.isFinite(canonicalAmount) || canonicalAmount <= 0) return null
+  return Math.round(((total * 100) / canonicalAmount) * 10) / 10
+}
+
+function formatMacroForSummary(value) {
+  const numeric = Number(value)
+  if (!Number.isFinite(numeric) || numeric < 0) return '—'
+  return `${numeric.toFixed(1).replace(/\.0$/, '')} g`
 }
 
 function save() {
@@ -599,5 +748,72 @@ defineExpose({ applySuggestion })
   overflow-y: auto;
   background: #fff;
   box-shadow: 0 8px 18px rgba(0, 0, 0, 0.14);
+}
+
+.nutrition-summary {
+  border: 1px solid rgba(25, 118, 210, 0.22);
+  border-radius: 10px;
+  background: #f8fbff;
+  overflow: hidden;
+  color: #1c2b3a;
+  font-family: 'Arial Black', Arial, Helvetica, sans-serif;
+  width: 100%;
+  margin-left: 0;
+  margin-right: auto;
+}
+
+@media (min-width: 600px) {
+  .nutrition-summary {
+    max-width: 420px;
+  }
+}
+
+.nutrition-title {
+  font-size: 1.2rem;
+  font-weight: 900;
+  line-height: 1.05;
+  letter-spacing: 0;
+  text-transform: none;
+  color: #1c2b3a;
+  padding: 6px 8px 4px;
+  background: rgba(25, 118, 210, 0.08);
+}
+
+.nutrition-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 8px;
+  border-top: 1px solid rgba(25, 118, 210, 0.16);
+  font-size: 0.9rem;
+  font-family: Arial, Helvetica, sans-serif;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.nutrition-row-main {
+  border-top: 0;
+  font-size: 1.08rem;
+  font-weight: 800;
+}
+
+.nutrition-row-main strong {
+  font-family: 'Arial Black', Arial, Helvetica, sans-serif;
+  font-size: 1.2rem;
+  line-height: 1;
+  color: #0f4c8a;
+}
+
+.nutrition-rule {
+  width: 100%;
+  background: rgba(25, 118, 210, 0.35);
+}
+
+.nutrition-rule-thick {
+  height: 4px;
+}
+
+.nutrition-rule-medium {
+  height: 2px;
 }
 </style>

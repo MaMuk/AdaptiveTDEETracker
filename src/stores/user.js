@@ -46,6 +46,7 @@ function migrateLegacyStoreIfNeeded() {
 
     localStorage.setItem(DIARY_STORAGE_KEY, JSON.stringify({
         foodDiaryEnabled: Boolean(legacy.foodDiaryEnabled),
+        diaryMacroTrackingEnabled: Boolean(legacy.diaryMacroTrackingEnabled),
         diarySections: Array.isArray(legacy.diarySections) && legacy.diarySections.length > 0
             ? legacy.diarySections
             : ['Breakfast', 'Lunch', 'Dinner', 'Snacks'],
@@ -96,6 +97,7 @@ export const useUserStore = defineStore('user', () => {
     const foodDiaryEnabled = computed({ get: () => diaryStore.foodDiaryEnabled, set: (v) => { diaryStore.foodDiaryEnabled = v } })
     const diarySections = computed({ get: () => diaryStore.diarySections, set: (v) => { diaryStore.diarySections = v } })
     const diarySectionPercentages = computed({ get: () => diaryStore.diarySectionPercentages, set: (v) => { diaryStore.diarySectionPercentages = v } })
+    const diaryMacroTrackingEnabled = computed({ get: () => diaryStore.diaryMacroTrackingEnabled, set: (v) => { diaryStore.diaryMacroTrackingEnabled = v } })
     const foodDiaryEntries = computed({ get: () => diaryStore.foodDiaryEntries, set: (v) => { diaryStore.foodDiaryEntries = v } })
     const diaryClosedSectionsByDate = computed({ get: () => diaryStore.diaryClosedSectionsByDate, set: (v) => { diaryStore.diaryClosedSectionsByDate = v } })
     const diaryBudgetSnapshotsByDate = computed({ get: () => diaryStore.diaryBudgetSnapshotsByDate, set: (v) => { diaryStore.diaryBudgetSnapshotsByDate = v } })
@@ -185,6 +187,7 @@ export const useUserStore = defineStore('user', () => {
         foodDiaryEnabled,
         diarySections,
         diarySectionPercentages,
+        diaryMacroTrackingEnabled,
         foodDiaryEntries,
         diaryClosedSectionsByDate,
         diaryBudgetSnapshotsByDate,
@@ -210,6 +213,7 @@ export const useUserStore = defineStore('user', () => {
         resetAll,
         setFoodDiaryEnabled: diaryStore.setFoodDiaryEnabled,
         setDiarySections: diaryStore.setDiarySections,
+        setDiaryMacroTrackingEnabled: diaryStore.setDiaryMacroTrackingEnabled,
         setDiarySectionPercentage: diaryStore.setDiarySectionPercentage,
         setDiaryClosedSectionsForDate: diaryStore.setDiaryClosedSectionsForDate,
         toggleDiarySectionClosedForDate: diaryStore.toggleDiarySectionClosedForDate,

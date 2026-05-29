@@ -14,7 +14,7 @@ const RECOGNITION_JSON_SCHEMA = {
       items: {
         type: 'object',
         additionalProperties: false,
-        required: ['name', 'calories', 'caloriesPer100', 'caloriesPer100Basis', 'confidence'],
+        required: ['name', 'calories', 'caloriesPer100', 'caloriesPer100Basis', 'protein', 'carbohydrates', 'fat', 'confidence'],
         properties: {
           name: { type: 'string' },
           calories: {
@@ -36,6 +36,24 @@ const RECOGNITION_JSON_SCHEMA = {
           caloriesPer100Basis: {
             type: 'string',
             enum: ['g', 'ml']
+          },
+          protein: {
+            anyOf: [
+              { type: 'number' },
+              { type: 'null' }
+            ]
+          },
+          carbohydrates: {
+            anyOf: [
+              { type: 'number' },
+              { type: 'null' }
+            ]
+          },
+          fat: {
+            anyOf: [
+              { type: 'number' },
+              { type: 'null' }
+            ]
           },
           confidence: {
             type: 'string',
@@ -73,6 +91,9 @@ export class OpenAiMealRecognitionProvider extends AiMealRecognitionProvider {
             calories: { low: 450, estimate: 520, high: 600 },
             caloriesPer100: 265,
             caloriesPer100Basis: 'g',
+            protein: 28,
+            carbohydrates: 34,
+            fat: 30,
             confidence: 'high'
           },
           {
@@ -80,6 +101,9 @@ export class OpenAiMealRecognitionProvider extends AiMealRecognitionProvider {
             calories: { low: 300, estimate: 380, high: 450 },
             caloriesPer100: 250,
             caloriesPer100Basis: 'g',
+            protein: 19,
+            carbohydrates: 32,
+            fat: 18,
             confidence: 'medium'
           },
           {
@@ -87,6 +111,9 @@ export class OpenAiMealRecognitionProvider extends AiMealRecognitionProvider {
             calories: { low: 320, estimate: 400, high: 480 },
             caloriesPer100: 240,
             caloriesPer100Basis: 'g',
+            protein: 20,
+            carbohydrates: 35,
+            fat: 19,
             confidence: 'medium'
           }
         ]
@@ -118,7 +145,7 @@ export class OpenAiMealRecognitionProvider extends AiMealRecognitionProvider {
             strict: true
           }
         },
-        max_output_tokens: 300
+        max_output_tokens: 500
       })
     })
 
@@ -156,10 +183,10 @@ function buildPrompt(options = {}) {
   const base = [
     'Estimate calories from this food photo for a calorie-only TDEE app.',
     'Return strict JSON only with this exact shape:',
-    '{"guesses":[{"name":"string","calories":{"low":number,"estimate":number,"high":number},"caloriesPer100":number|null,"caloriesPer100Basis":"g|ml","confidence":"low|medium|high"}]}.',
+    '{"guesses":[{"name":"string","calories":{"low":number,"estimate":number,"high":number},"caloriesPer100":number|null,"caloriesPer100Basis":"g|ml","protein":number|null,"carbohydrates":number|null,"fat":number|null,"confidence":"low|medium|high"}]}.',
     'Provide up to 4 plausible guesses.',
     'Avoid fake precision. Keep ranges realistic.',
-    'No macros. No explanation text.'
+    'Include macros in grams when possible; otherwise use null. No explanation text.'
   ]
 
   if (context === 'diary') {

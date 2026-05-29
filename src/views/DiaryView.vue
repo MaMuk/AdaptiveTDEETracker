@@ -147,6 +147,12 @@
               <div class="text-caption text-grey-7">
                 {{ row.amount || 'No amount' }} · {{ row.calories }} kcal<span v-if="row.usePer100g"> · {{ row.caloriesPer100g || 0 }} kcal/100g</span>
               </div>
+              <div
+                v-if="store.diaryMacroTrackingEnabled"
+                class="text-caption text-grey-7"
+              >
+                P {{ formatMacroWithUnit(row.protein) }} · C {{ formatMacroWithUnit(row.carbohydrates) }} · F {{ formatMacroWithUnit(row.fat) }}
+              </div>
             </div>
             <div class="row items-center q-gutter-xs no-wrap">
               <q-btn
@@ -221,6 +227,46 @@
       </div>
     </q-card>
 
+    <q-card
+      v-if="store.diaryMacroTrackingEnabled"
+      class="q-mt-sm q-mb-sm"
+    >
+      <q-card-section>
+        <div class="text-subtitle2 q-mb-xs">
+          Tracked Macro Distribution
+        </div>
+        <div class="text-caption">
+          Protein: {{ formatMacroDistributionLine(macroDistribution.protein) }}
+        </div>
+        <div class="text-caption">
+          Carbohydrates: {{ formatMacroDistributionLine(macroDistribution.carbohydrates) }}
+        </div>
+        <div class="text-caption">
+          Fat: {{ formatMacroDistributionLine(macroDistribution.fat) }}
+        </div>
+      </q-card-section>
+    </q-card>
+
+    <q-card
+      v-if="store.diaryMacroTrackingEnabled"
+      class="q-mt-sm q-mb-sm"
+    >
+      <q-card-section>
+        <div class="text-subtitle2 q-mb-xs">
+          Macro Tracking Coverage
+        </div>
+        <div class="text-caption">
+          Protein tracked: {{ macroCoverage.protein.tracked }} / {{ macroCoverage.protein.total }} (missing {{ macroCoverage.protein.missing }})
+        </div>
+        <div class="text-caption">
+          Carbohydrates tracked: {{ macroCoverage.carbohydrates.tracked }} / {{ macroCoverage.carbohydrates.total }} (missing {{ macroCoverage.carbohydrates.missing }})
+        </div>
+        <div class="text-caption">
+          Fat tracked: {{ macroCoverage.fat.tracked }} / {{ macroCoverage.fat.total }} (missing {{ macroCoverage.fat.missing }})
+        </div>
+      </q-card-section>
+    </q-card>
+
     <EntryDialog
       ref="entryDialogRef"
       v-model="showEntryDialog"
@@ -230,6 +276,7 @@
       :suggestions="rankedSuggestions"
       :measurement-units="store.measurementUnits"
       :measurement-unit-multipliers="store.measurementUnitMultipliers"
+      :show-macro-fields="store.diaryMacroTrackingEnabled"
       @save="saveEntryFromDialog"
       @open-suggestion-picker="openSuggestionPicker($event, true)"
     />
@@ -479,6 +526,42 @@ const sectionCalories = computed(() => {
   return map
 })
 const overallTrackedCalories = computed(() => Object.values(sectionCalories.value).reduce((sum, calories) => sum + calories, 0))
+const macroCoverage = computed(() => {
+  const entries = dayEntries.value
+  const total = entries.length
+  const countTracked = (key) => entries.filter(item => Number.isFinite(Number(item?.[key])) && Number(item[key]) >= 0).length
+  const proteinTracked = countTracked('protein')
+  const carbsTracked = countTracked('carbohydrates')
+  const fatTracked = countTracked('fat')
+  return {
+    protein: { total, tracked: proteinTracked, missing: Math.max(0, total - proteinTracked) },
+    carbohydrates: { total, tracked: carbsTracked, missing: Math.max(0, total - carbsTracked) },
+    fat: { total, tracked: fatTracked, missing: Math.max(0, total - fatTracked) }
+  }
+})
+const macroDistribution = computed(() => {
+  const collect = (key) => {
+    let sum = 0
+    let tracked = 0
+    for (const item of dayEntries.value) {
+      const numeric = Number(item?.[key])
+      if (!Number.isFinite(numeric) || numeric < 0) continue
+      sum += numeric
+      tracked += 1
+    }
+    return { grams: Math.round(sum * 10) / 10, tracked }
+  }
+  const protein = collect('protein')
+  const carbohydrates = collect('carbohydrates')
+  const fat = collect('fat')
+  const totalTrackedGrams = protein.grams + carbohydrates.grams + fat.grams
+  const toPercent = (value) => (totalTrackedGrams > 0 ? Math.round((value / totalTrackedGrams) * 100) : 0)
+  return {
+    protein: { ...protein, percent: toPercent(protein.grams) },
+    carbohydrates: { ...carbohydrates, percent: toPercent(carbohydrates.grams) },
+    fat: { ...fat, percent: toPercent(fat.grams) }
+  }
+})
 
 const allSuggestionTags = computed(() => {
   const tags = new Set()
@@ -677,6 +760,9 @@ function saveEntryFromDialog(payload) {
     amount: String(payload.amount || '').trim(),
     calories: Number(payload.calories) || 0,
     section: payload.section || '',
+    protein: toNullableMacro(payload.protein),
+    carbohydrates: toNullableMacro(payload.carbohydrates),
+    fat: toNullableMacro(payload.fat),
     usePer100g: Boolean(payload.usePer100g),
     caloriesPer100g: payload.usePer100g ? Number(payload.caloriesPer100g) : null
   }
@@ -686,6 +772,27 @@ function saveEntryFromDialog(payload) {
   } else {
     store.addDiaryEntry(selectedDate.value, normalizedPayload, { syncSuggestion: true })
   }
+}
+
+function formatMacro(value) {
+  const numeric = Number(value)
+  return Number.isFinite(numeric) && numeric >= 0 ? numeric.toFixed(1).replace(/\.0$/, '') : '—'
+}
+
+function formatMacroWithUnit(value) {
+  const formatted = formatMacro(value)
+  return formatted === '—' ? '—' : `${formatted}g`
+}
+
+function formatMacroDistributionLine(item) {
+  if (!item || Number(item.tracked) <= 0) return 'Not set'
+  return `${item.grams}g (${item.percent}%)`
+}
+
+function toNullableMacro(value) {
+  if (value === null || value === undefined || value === '') return null
+  const numeric = Number(value)
+  return Number.isFinite(numeric) && numeric >= 0 ? numeric : null
 }
 
 function confirmDeleteRow(row) {
@@ -721,6 +828,9 @@ function loadSuggestion(suggestion) {
       amount: suggestion.amount || '',
       calories: Number(suggestion.calories),
       section: suggestionTargetSection.value,
+      protein: toNullableMacro(suggestion.protein),
+      carbohydrates: toNullableMacro(suggestion.carbohydrates),
+      fat: toNullableMacro(suggestion.fat),
       usePer100g: Boolean(suggestion.usePer100g),
       caloriesPer100g: suggestion.caloriesPer100g
     })

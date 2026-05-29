@@ -73,6 +73,7 @@
         </div>
         <DiaryFields
           :enabled="localFoodDiaryEnabled"
+          :macro-tracking-enabled="localDiaryMacroTrackingEnabled"
           :sections-text="localDiarySectionsText"
           :section-percentage-fields="sectionPercentageFields"
           :section-percentages="localSectionPercentages"
@@ -85,6 +86,7 @@
           @update:section-percentage="onSectionPercentageUpdate"
           @update:measurement-system="applyMeasurementPreset"
           @update:measurement-units="localMeasurementUnits = $event"
+          @update:macro-tracking-enabled="localDiaryMacroTrackingEnabled = $event"
         />
       </q-card-section>
     </q-card>
@@ -370,6 +372,7 @@ const localSex = ref('male')
 const localWeeklyRate = ref(0.5)
 const customRate = ref(0)
 const localFoodDiaryEnabled = ref(false)
+const localDiaryMacroTrackingEnabled = ref(false)
 const localDiarySectionsText = ref('Breakfast, Lunch, Dinner, Snacks')
 const localSectionPercentages = ref({})
 const localAiMealRecognitionEnabled = ref(false)
@@ -426,6 +429,7 @@ onMounted(() => {
   }
 
   localFoodDiaryEnabled.value = store.foodDiaryEnabled
+  localDiaryMacroTrackingEnabled.value = store.diaryMacroTrackingEnabled
   localDiarySectionsText.value = (store.diarySections || []).join(', ')
   localSectionPercentages.value = { ...(store.diarySectionPercentages || {}) }
   localAiMealRecognitionEnabled.value = store.aiMealRecognitionEnabled
@@ -558,6 +562,7 @@ function saveSettings() {
   store.setStartupActivityEnabled(localStartupActivityEnabled.value)
   store.setStartupActivityLevel(localStartupActivityLevel.value)
   store.setFoodDiaryEnabled(localFoodDiaryEnabled.value)
+  store.setDiaryMacroTrackingEnabled(localDiaryMacroTrackingEnabled.value)
   store.setDiarySections(localDiarySectionsText.value.split(','))
   for (const field of sectionPercentageFields.value) {
     store.setDiarySectionPercentage(field.key, Number(localSectionPercentages.value[field.key]) || 0)
@@ -604,6 +609,7 @@ function resetData() {
     localWeeklyRate.value = 0.5
     customRate.value = 0
     localFoodDiaryEnabled.value = false
+    localDiaryMacroTrackingEnabled.value = false
     localDiarySectionsText.value = 'Breakfast, Lunch, Dinner, Snacks'
     localSectionPercentages.value = { ...(store.diarySectionPercentages || {}) }
     localAiMealRecognitionEnabled.value = false

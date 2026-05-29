@@ -137,6 +137,12 @@
                 Tags
               </th>
               <th
+                v-if="store.diaryMacroTrackingEnabled && visibleColumns.macros"
+                class="text-left"
+              >
+                Macros (g)
+              </th>
+              <th
                 v-if="visibleColumns.notes"
                 class="text-left"
               >
@@ -167,6 +173,9 @@
               </td>
               <td v-if="visibleColumns.tags">
                 {{ item.tagsCsv || '-' }}
+              </td>
+              <td v-if="store.diaryMacroTrackingEnabled && visibleColumns.macros">
+                P {{ formatMacroForSuggestion(item, 'protein') }} / C {{ formatMacroForSuggestion(item, 'carbohydrates') }} / F {{ formatMacroForSuggestion(item, 'fat') }}
               </td>
               <td v-if="visibleColumns.notes">
                 {{ item.notes || '-' }}
@@ -239,6 +248,7 @@
       :save-label="suggestionDialogEntry?.id ? 'Save' : 'Add'"
       :enable-suggestion-picker="false"
       :show-metadata-fields="true"
+      :show-macro-fields="store.diaryMacroTrackingEnabled"
       :measurement-units="store.measurementUnits"
       :measurement-unit-multipliers="store.measurementUnitMultipliers"
       @save="saveSuggestionFromDialog"
@@ -273,6 +283,7 @@ const columnOptions = [
   { key: 'calories', label: 'kcal' },
   { key: 'usePer100g', label: 'Calulated' },
   { key: 'tags', label: 'Tags' },
+  { key: 'macros', label: 'Macros (g)' },
   { key: 'notes', label: 'Notes' }
 ]
 const visibleColumns = computed(() => store.suggestionsVisibleColumns || {})
@@ -366,6 +377,9 @@ function openEditSuggestionDialog(item) {
     calories: Number(item.calories) || 0,
     usePer100g: Boolean(item.usePer100g),
     caloriesPer100g: item.caloriesPer100g ?? null,
+    protein: toNullableMacro(item.protein),
+    carbohydrates: toNullableMacro(item.carbohydrates),
+    fat: toNullableMacro(item.fat),
     notes: String(item.notes || ''),
     tagsCsv: String(item.tagsCsv || ''),
     tags: Array.isArray(item.tags) ? item.tags : []
@@ -380,6 +394,9 @@ function saveSuggestionFromDialog(entryPayload) {
     calories: Number(entryPayload.calories) || 0,
     usePer100g: Boolean(entryPayload.usePer100g),
     caloriesPer100g: entryPayload.usePer100g ? Number(entryPayload.caloriesPer100g) : null,
+    protein: toNullableMacro(entryPayload.protein),
+    carbohydrates: toNullableMacro(entryPayload.carbohydrates),
+    fat: toNullableMacro(entryPayload.fat),
     notes: String(entryPayload.notes || '').trim(),
     tags: parseTags(entryPayload.tagsCsv)
   }
@@ -391,6 +408,26 @@ function saveSuggestionFromDialog(entryPayload) {
   }
   showSuggestionDialog.value = false
   suggestionDialogEntry.value = null
+}
+
+function formatMacro(value) {
+  const numeric = Number(value)
+  return Number.isFinite(numeric) && numeric >= 0 ? numeric.toFixed(1).replace(/\.0$/, '') : '—'
+}
+
+function formatMacroForSuggestion(item, key) {
+  const protein = toNullableMacro(item?.protein)
+  const carbohydrates = toNullableMacro(item?.carbohydrates)
+  const fat = toNullableMacro(item?.fat)
+  // Legacy cleanup for previously auto-coerced null->0 macros.
+  if (protein === 0 && carbohydrates === 0 && fat === 0) return '—'
+  return formatMacro(item?.[key])
+}
+
+function toNullableMacro(value) {
+  if (value === null || value === undefined || value === '') return null
+  const numeric = Number(value)
+  return Number.isFinite(numeric) && numeric >= 0 ? numeric : null
 }
 
 function remove(item) {

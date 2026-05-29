@@ -26,12 +26,21 @@ function sanitizeGuess(rawGuess, provider) {
     ? Math.round(caloriesPer100Raw)
     : null
   const caloriesPer100Basis = rawGuess?.caloriesPer100Basis === 'ml' ? 'ml' : 'g'
+  const proteinRaw = Number(rawGuess?.protein)
+  const carbohydratesRaw = Number(rawGuess?.carbohydrates)
+  const fatRaw = Number(rawGuess?.fat)
+  const protein = Number.isFinite(proteinRaw) && proteinRaw >= 0 ? Math.round(proteinRaw * 10) / 10 : null
+  const carbohydrates = Number.isFinite(carbohydratesRaw) && carbohydratesRaw >= 0 ? Math.round(carbohydratesRaw * 10) / 10 : null
+  const fat = Number.isFinite(fatRaw) && fatRaw >= 0 ? Math.round(fatRaw * 10) / 10 : null
 
   return {
     name,
     calories,
     caloriesPer100,
     caloriesPer100Basis,
+    protein,
+    carbohydrates,
+    fat,
     confidence,
     provider
   }

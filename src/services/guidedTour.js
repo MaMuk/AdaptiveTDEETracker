@@ -20,17 +20,6 @@ async function waitForElement(selector, timeoutMs = 3000) {
   return false
 }
 
-function createTour(steps) {
-  const tour = driver({
-    showProgress: true,
-    animate: true,
-    steps
-  })
-  activeDriver = tour
-  tour.drive()
-  return tour
-}
-
 export async function startGuidedProductTour({ router, store, onFinish }) {
   stopActiveTour()
   await router.push({ path: '/', query: { tourMock: '1' } })

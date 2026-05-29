@@ -4,10 +4,25 @@ import { normalizeDensityFields, withLegacyDensityFields } from '../../utils/nut
 
 const STORAGE_KEY = 'tdee_suggestions_store'
 
+function normalizeMacroValue(value) {
+    if (value === null || value === undefined || value === '') return null
+    const numeric = Number(value)
+    return Number.isFinite(numeric) && numeric >= 0 ? Math.round(numeric * 10) / 10 : null
+}
+
+function normalizeMacroFields(item) {
+    return {
+        protein: normalizeMacroValue(item?.protein),
+        carbohydrates: normalizeMacroValue(item?.carbohydrates),
+        fat: normalizeMacroValue(item?.fat)
+    }
+}
+
 function normalizeSuggestions(items) {
     return (Array.isArray(items) ? items : []).map((item) => ({
         ...item,
         ...withLegacyDensityFields(item),
+        ...normalizeMacroFields(item),
         notes: String(item?.notes || ''),
         tags: Array.isArray(item?.tags)
             ? [...new Set(item.tags.map(tag => String(tag || '').trim()).filter(Boolean))]
@@ -29,6 +44,7 @@ export const useSuggestionsStore = defineStore('suggestions', () => {
             name,
             amount: entry.amount || '',
             calories: caloriesValue,
+            ...normalizeMacroFields(entry),
             ...normalizeDensityFields(entry),
             notes: existing?.notes || '',
             tags: Array.isArray(existing?.tags) ? existing.tags : [],
@@ -57,6 +73,7 @@ export const useSuggestionsStore = defineStore('suggestions', () => {
             name,
             amount: suggestion.amount || '',
             calories: caloriesValue,
+            ...normalizeMacroFields(suggestion),
             ...normalizeDensityFields(suggestion),
             notes: String(suggestion.notes || ''),
             tags: Array.isArray(suggestion.tags)
@@ -76,6 +93,10 @@ export const useSuggestionsStore = defineStore('suggestions', () => {
             ...updates,
             name: String(updates.name ?? foodSuggestions.value[index].name).trim(),
             calories: Number(updates.calories ?? foodSuggestions.value[index].calories) || 0,
+            ...normalizeMacroFields({
+                ...foodSuggestions.value[index],
+                ...updates
+            }),
             ...normalizeDensityFields({
                 ...foodSuggestions.value[index],
                 ...updates

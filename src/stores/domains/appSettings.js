@@ -15,6 +15,7 @@ const DEFAULT_SUGGESTIONS_VISIBLE_COLUMNS = {
     usePer100g: true,
     caloriesPer100g: true,
     tags: true,
+    macros: true,
     notes: true
 }
 

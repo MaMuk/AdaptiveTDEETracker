@@ -218,6 +218,42 @@
           class="q-mb-sm"
         />
 
+        <div
+          v-if="store.diaryMacroTrackingEnabled"
+          class="row q-col-gutter-sm q-mb-sm"
+        >
+          <div class="col-12 col-sm-4">
+            <q-input
+              v-model.number="draftProtein"
+              type="number"
+              min="0"
+              step="0.1"
+              filled
+              label="Protein (g)"
+            />
+          </div>
+          <div class="col-12 col-sm-4">
+            <q-input
+              v-model.number="draftCarbohydrates"
+              type="number"
+              min="0"
+              step="0.1"
+              filled
+              label="Carbohydrates (g)"
+            />
+          </div>
+          <div class="col-12 col-sm-4">
+            <q-input
+              v-model.number="draftFat"
+              type="number"
+              min="0"
+              step="0.1"
+              filled
+              label="Fat (g)"
+            />
+          </div>
+        </div>
+
         <q-btn
           color="positive"
           label="Add to Suggestions"
@@ -275,6 +311,9 @@ const draftAmount = ref('')
 const draftUsePer100g = ref(false)
 const draftCalories = ref(0)
 const draftCaloriesPer100g = ref(null)
+const draftProtein = ref(null)
+const draftCarbohydrates = ref(null)
+const draftFat = ref(null)
 
 onMounted(() => {
   if (!store.aiMealRecognitionEnabled) {
@@ -300,6 +339,9 @@ function clearFlow() {
   draftUsePer100g.value = false
   draftCalories.value = 0
   draftCaloriesPer100g.value = null
+  draftProtein.value = null
+  draftCarbohydrates.value = null
+  draftFat.value = null
   errorMessage.value = ''
   warningMessage.value = ''
   demoMessage.value = ''
@@ -370,6 +412,9 @@ function selectGuess(index) {
   draftCaloriesPer100g.value = Number.isFinite(Number(guess.caloriesPer100g))
     ? Number(guess.caloriesPer100g)
     : (isNutritionLabel.value ? Number(guess.calories.estimate) || 0 : null)
+  draftProtein.value = toNullableMacro(guess.protein)
+  draftCarbohydrates.value = toNullableMacro(guess.carbohydrates)
+  draftFat.value = toNullableMacro(guess.fat)
 
   if (guess.confidence === 'low') {
     warningMessage.value = 'Low confidence result. Review and edit carefully before adding.'
@@ -401,6 +446,9 @@ function saveSuggestion() {
     name,
     amount,
     calories: draftUsePer100g.value ? Math.round(caloriesPer100g) : Math.round(calories),
+    protein: toNullableMacro(draftProtein.value),
+    carbohydrates: toNullableMacro(draftCarbohydrates.value),
+    fat: toNullableMacro(draftFat.value),
     usePer100g: draftUsePer100g.value,
     caloriesPer100g: draftUsePer100g.value ? Math.round(caloriesPer100g) : null
   })
@@ -412,5 +460,11 @@ function saveSuggestion() {
 function goBack() {
   clearFlow()
   router.push('/suggestions')
+}
+
+function toNullableMacro(value) {
+  if (value === null || value === undefined || value === '') return null
+  const numeric = Number(value)
+  return Number.isFinite(numeric) && numeric >= 0 ? numeric : null
 }
 </script>
