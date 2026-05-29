@@ -216,10 +216,10 @@
                 class="btn-muted-blue"
                 unelevated
                 dense
-                icon="history"
-                label="Add from History"
+                icon="restaurant"
+                label="Create Meal"
                 :disable="isSectionClosed(section.value)"
-                @click="openSuggestionPicker(section.value)"
+                @click="openCreateMealDialog(section.value)"
               />
             </div>
           </div>
@@ -466,6 +466,7 @@ const suggestionForEntryDialog = ref(false)
 const entryDialogRef = ref(null)
 const activeEntryRow = ref(null)
 const entryDialogSection = ref('')
+const pendingSectionCombine = ref(null)
 
 const allSections = computed(() => ([
   { label: 'Unsectioned', value: '' },
@@ -626,6 +627,11 @@ watch([suggestionSearch, suggestionPageSize, suggestionTagFilter, suggestionCalc
   suggestionPage.value = 1
 })
 
+watch(showEntryDialog, (isOpen) => {
+  if (isOpen) return
+  pendingSectionCombine.value = null
+})
+
 watch(selectedDate, date => {
   router.replace({ path: '/diary', query: { date } })
   ensureBudgetSnapshot(date)
@@ -749,6 +755,7 @@ function ensureBudgetSnapshot(date) {
 }
 
 function openEntryDialog({ section, row = null }) {
+  pendingSectionCombine.value = null
   activeEntryRow.value = row ? { ...row } : null
   entryDialogSection.value = section || ''
   showEntryDialog.value = true
@@ -767,11 +774,61 @@ function saveEntryFromDialog(payload) {
     caloriesPer100g: payload.usePer100g ? Number(payload.caloriesPer100g) : null
   }
 
+  if (!payload.id && pendingSectionCombine.value && pendingSectionCombine.value.date === selectedDate.value) {
+    for (const entryId of pendingSectionCombine.value.entryIds) {
+      store.deleteDiaryEntry(entryId)
+    }
+    pendingSectionCombine.value = null
+  }
+
   if (payload.id) {
     store.updateDiaryEntry(payload.id, normalizedPayload, { syncSuggestion: true })
   } else {
     store.addDiaryEntry(selectedDate.value, normalizedPayload, { syncSuggestion: true })
   }
+}
+
+function sumSectionMacro(entries, key) {
+  let total = 0
+  let hasValue = false
+  for (const entry of entries) {
+    const numeric = Number(entry?.[key])
+    if (!Number.isFinite(numeric) || numeric < 0) continue
+    total += numeric
+    hasValue = true
+  }
+  return hasValue ? Math.round(total * 10) / 10 : null
+}
+
+function openCreateMealDialog(section) {
+  const sectionEntries = entriesBySection(section)
+  if (sectionEntries.length === 0) {
+    $q.notify({
+      type: 'warning',
+      message: 'This section has no entries to combine.'
+    })
+    return
+  }
+
+  const combinedCalories = sectionEntries.reduce((sum, entry) => sum + (Number(entry.calories) || 0), 0)
+  activeEntryRow.value = {
+    name: '',
+    amount: '1 serving',
+    calories: Math.round(combinedCalories),
+    section: section || '',
+    protein: sumSectionMacro(sectionEntries, 'protein'),
+    carbohydrates: sumSectionMacro(sectionEntries, 'carbohydrates'),
+    fat: sumSectionMacro(sectionEntries, 'fat'),
+    usePer100g: false,
+    caloriesPer100g: null
+  }
+  entryDialogSection.value = section || ''
+  pendingSectionCombine.value = {
+    date: selectedDate.value,
+    section: section || '',
+    entryIds: sectionEntries.map(entry => entry.id)
+  }
+  showEntryDialog.value = true
 }
 
 function formatMacro(value) {
