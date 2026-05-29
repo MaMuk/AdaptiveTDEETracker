@@ -411,6 +411,7 @@ function saveSuggestionFromDialog(entryPayload) {
 }
 
 function formatMacro(value) {
+  if (value === null || value === undefined || value === '') return '—'
   const numeric = Number(value)
   return Number.isFinite(numeric) && numeric >= 0 ? numeric.toFixed(1).replace(/\.0$/, '') : '—'
 }

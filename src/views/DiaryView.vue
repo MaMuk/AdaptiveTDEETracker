@@ -149,9 +149,29 @@
               </div>
               <div
                 v-if="store.diaryMacroTrackingEnabled"
-                class="text-caption text-grey-7"
+                class="macro-inline-row"
               >
-                P {{ formatMacroWithUnit(row.protein) }} · C {{ formatMacroWithUnit(row.carbohydrates) }} · F {{ formatMacroWithUnit(row.fat) }}
+                <q-badge
+                  class="macro-pill"
+                  outline
+                  color="red-6"
+                >
+                  P {{ formatMacroWithUnit(macroTotalFromEntry(row, 'protein')) }}
+                </q-badge>
+                <q-badge
+                  class="macro-pill"
+                  outline
+                  color="amber-7"
+                >
+                  C {{ formatMacroWithUnit(macroTotalFromEntry(row, 'carbohydrates')) }}
+                </q-badge>
+                <q-badge
+                  class="macro-pill"
+                  outline
+                  color="green-6"
+                >
+                  F {{ formatMacroWithUnit(macroTotalFromEntry(row, 'fat')) }}
+                </q-badge>
               </div>
             </div>
             <div class="row items-center q-gutter-xs no-wrap">
@@ -235,14 +255,32 @@
         <div class="text-subtitle2 q-mb-xs">
           Tracked Macro Distribution
         </div>
-        <div class="text-caption">
-          Protein: {{ formatMacroDistributionLine(macroDistribution.protein) }}
-        </div>
-        <div class="text-caption">
-          Carbohydrates: {{ formatMacroDistributionLine(macroDistribution.carbohydrates) }}
-        </div>
-        <div class="text-caption">
-          Fat: {{ formatMacroDistributionLine(macroDistribution.fat) }}
+        <div class="row items-center q-col-gutter-md">
+          <div class="col-auto">
+            <div
+              class="macro-pie-chart"
+              :style="{ background: macroPieBackground }"
+              role="img"
+              :aria-label="macroPieAriaLabel"
+            />
+          </div>
+          <div class="col">
+            <div class="text-caption q-mb-xs">
+              Total tracked: {{ formatMacroWithUnit(macroDistribution.totalTrackedGrams) }}
+            </div>
+            <div class="text-caption macro-legend-row">
+              <span class="macro-legend-swatch macro-legend-protein" aria-hidden="true" />
+              Protein: {{ formatMacroDistributionLine(macroDistribution.protein) }}
+            </div>
+            <div class="text-caption macro-legend-row">
+              <span class="macro-legend-swatch macro-legend-carbohydrates" aria-hidden="true" />
+              Carbohydrates: {{ formatMacroDistributionLine(macroDistribution.carbohydrates) }}
+            </div>
+            <div class="text-caption macro-legend-row">
+              <span class="macro-legend-swatch macro-legend-fat" aria-hidden="true" />
+              Fat: {{ formatMacroDistributionLine(macroDistribution.fat) }}
+            </div>
+          </div>
         </div>
       </q-card-section>
     </q-card>
@@ -441,6 +479,7 @@ import CalorieBudgetBar from '../components/CalorieBudgetBar.vue'
 import EntryDialog from '../components/EntryDialog.vue'
 import { addDays, todayKey } from '../utils/dateKey'
 import { computeCalorieTarget } from '../utils/tdee'
+import { convertAmountBetweenUnits, getUnitById, resolveUnitId } from '../utils/unitLibrary'
 
 const store = useUserStore()
 const route = useRoute()
@@ -530,7 +569,7 @@ const overallTrackedCalories = computed(() => Object.values(sectionCalories.valu
 const macroCoverage = computed(() => {
   const entries = dayEntries.value
   const total = entries.length
-  const countTracked = (key) => entries.filter(item => Number.isFinite(Number(item?.[key])) && Number(item[key]) >= 0).length
+  const countTracked = (key) => entries.filter(item => hasTrackedMacroValueForEntry(item, key)).length
   const proteinTracked = countTracked('protein')
   const carbsTracked = countTracked('carbohydrates')
   const fatTracked = countTracked('fat')
@@ -545,7 +584,7 @@ const macroDistribution = computed(() => {
     let sum = 0
     let tracked = 0
     for (const item of dayEntries.value) {
-      const numeric = Number(item?.[key])
+      const numeric = macroTotalFromEntry(item, key)
       if (!Number.isFinite(numeric) || numeric < 0) continue
       sum += numeric
       tracked += 1
@@ -558,11 +597,25 @@ const macroDistribution = computed(() => {
   const totalTrackedGrams = protein.grams + carbohydrates.grams + fat.grams
   const toPercent = (value) => (totalTrackedGrams > 0 ? Math.round((value / totalTrackedGrams) * 100) : 0)
   return {
+    totalTrackedGrams: Math.round(totalTrackedGrams * 10) / 10,
     protein: { ...protein, percent: toPercent(protein.grams) },
     carbohydrates: { ...carbohydrates, percent: toPercent(carbohydrates.grams) },
     fat: { ...fat, percent: toPercent(fat.grams) }
   }
 })
+const macroPieBackground = computed(() => {
+  if (macroDistribution.value.totalTrackedGrams <= 0) return '#eceff1'
+  const protein = macroDistribution.value.protein.percent
+  const carbohydrates = macroDistribution.value.carbohydrates.percent
+  const proteinEnd = protein
+  const carbsEnd = protein + carbohydrates
+  return `conic-gradient(#e53935 0 ${proteinEnd}%, #fbc02d ${proteinEnd}% ${carbsEnd}%, #43a047 ${carbsEnd}% 100%)`
+})
+const macroPieAriaLabel = computed(() => (
+  `Macronutrient distribution: protein ${macroDistribution.value.protein.percent} percent, `
+  + `carbohydrates ${macroDistribution.value.carbohydrates.percent} percent, `
+  + `fat ${macroDistribution.value.fat.percent} percent`
+))
 
 const allSuggestionTags = computed(() => {
   const tags = new Set()
@@ -832,6 +885,7 @@ function openCreateMealDialog(section) {
 }
 
 function formatMacro(value) {
+  if (value === null || value === undefined || value === '') return '—'
   const numeric = Number(value)
   return Number.isFinite(numeric) && numeric >= 0 ? numeric.toFixed(1).replace(/\.0$/, '') : '—'
 }
@@ -844,6 +898,49 @@ function formatMacroWithUnit(value) {
 function formatMacroDistributionLine(item) {
   if (!item || Number(item.tracked) <= 0) return 'Not set'
   return `${item.grams}g (${item.percent}%)`
+}
+
+function parseEntryAmount(item) {
+  const raw = String(item?.amount || '').trim().replace(',', '.')
+  const match = raw.match(/^(\d+(?:\.\d+)?)\s*(.+)$/)
+  if (!match) return { amount: null, unit: null }
+  return { amount: Number(match[1]), unit: resolveUnitId(match[2]) || null }
+}
+
+function hasTrackedMacroValue(value) {
+  if (value === null || value === undefined || value === '') return false
+  const numeric = Number(value)
+  return Number.isFinite(numeric) && numeric >= 0
+}
+
+function isLegacyUntrackedMacroTriplet(entry) {
+  const protein = toNullableMacro(entry?.protein)
+  const carbohydrates = toNullableMacro(entry?.carbohydrates)
+  const fat = toNullableMacro(entry?.fat)
+  return protein === 0 && carbohydrates === 0 && fat === 0
+}
+
+function hasTrackedMacroValueForEntry(entry, key) {
+  if (isLegacyUntrackedMacroTriplet(entry)) return false
+  return hasTrackedMacroValue(entry?.[key])
+}
+
+function macroTotalFromEntry(item, key) {
+  if (!hasTrackedMacroValueForEntry(item, key)) return null
+  const numeric = Number(item?.[key])
+  if (!item || item.densityMode !== 'per100') return numeric
+
+  const parsed = parseEntryAmount(item)
+  if (!Number.isFinite(parsed.amount) || parsed.amount <= 0 || !parsed.unit) return numeric
+  const category = getUnitById(parsed.unit)?.category || 'mass'
+  if (category === 'portion') return Math.round((parsed.amount * numeric) * 10) / 10
+  if (parsed.unit !== 'g' && parsed.unit !== 'ml') return Math.round((parsed.amount * numeric) * 10) / 10
+
+  const canonicalAmount = category === 'volume'
+    ? convertAmountBetweenUnits(parsed.amount, parsed.unit, 'ml')
+    : convertAmountBetweenUnits(parsed.amount, parsed.unit, 'g')
+  if (!Number.isFinite(canonicalAmount)) return numeric
+  return Math.round(((canonicalAmount * numeric) / 100) * 10) / 10
 }
 
 function toNullableMacro(value) {
@@ -963,6 +1060,22 @@ ensureBudgetSnapshot(selectedDate.value)
   background: rgba(250, 250, 250, 0.9);
 }
 
+.macro-inline-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: nowrap;
+  overflow: hidden;
+  margin-top: 2px;
+}
+
+.macro-pill {
+  font-size: 10px;
+  line-height: 1.2;
+  padding: 2px 5px;
+  white-space: nowrap;
+}
+
 .btn-muted-green {
   background: #7da882;
   color: #fff;
@@ -971,6 +1084,40 @@ ensureBudgetSnapshot(selectedDate.value)
 .btn-muted-blue {
   background: #6f8fac;
   color: #fff;
+}
+
+.macro-pie-chart {
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  background: #eceff1;
+}
+
+.macro-legend-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.macro-legend-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  display: inline-block;
+  flex: 0 0 10px;
+}
+
+.macro-legend-protein {
+  background: #e53935;
+}
+
+.macro-legend-carbohydrates {
+  background: #fbc02d;
+}
+
+.macro-legend-fat {
+  background: #43a047;
 }
 
 </style>

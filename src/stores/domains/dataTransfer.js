@@ -9,6 +9,12 @@ import { useAppSettingsStore } from './appSettings'
 const EXPORT_SCHEMA_VERSION = 7
 const EXPORT_SECTION_KEYS = ['profile', 'logs', 'foodDiary', 'foodSuggestions', 'appSettings']
 
+function toNullableMacro(value) {
+    if (value === null || value === undefined || value === '') return null
+    const numeric = Number(value)
+    return Number.isFinite(numeric) && numeric >= 0 ? numeric : null
+}
+
 export const useDataTransferStore = defineStore('dataTransfer', () => {
     const profileStore = useProfileLogsTdeeStore()
     const diaryStore = useDiaryStore()
@@ -77,9 +83,9 @@ export const useDataTransferStore = defineStore('dataTransfer', () => {
         if (selected.includes('foodSuggestions')) {
             const normalizedSuggestions = (Array.isArray(suggestionsStore.foodSuggestions) ? suggestionsStore.foodSuggestions : []).map((item) => ({
                 ...item,
-                protein: Number.isFinite(Number(item?.protein)) ? Number(item.protein) : null,
-                carbohydrates: Number.isFinite(Number(item?.carbohydrates)) ? Number(item.carbohydrates) : null,
-                fat: Number.isFinite(Number(item?.fat)) ? Number(item.fat) : null,
+                protein: toNullableMacro(item?.protein),
+                carbohydrates: toNullableMacro(item?.carbohydrates),
+                fat: toNullableMacro(item?.fat),
                 densityMode: item.densityMode === 'per100' ? 'per100' : 'none',
                 densityBasis: item.densityBasis === 'volume' ? 'volume' : 'mass',
                 densityKcalPer100Canonical: Number.isFinite(Number(item.densityKcalPer100Canonical))

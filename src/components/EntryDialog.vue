@@ -625,9 +625,9 @@ function validateDraft() {
 }
 
 function toPayload() {
-  const protein = Number(logMode.value === 'measured' ? computeMacroTotalFromMeasured(proteinInput.value) : proteinInput.value)
-  const carbohydrates = Number(logMode.value === 'measured' ? computeMacroTotalFromMeasured(carbohydratesInput.value) : carbohydratesInput.value)
-  const fat = Number(logMode.value === 'measured' ? computeMacroTotalFromMeasured(fatInput.value) : fatInput.value)
+  const protein = normalizeMacroPayloadValue(logMode.value === 'measured' ? computeMacroTotalFromMeasured(proteinInput.value) : proteinInput.value)
+  const carbohydrates = normalizeMacroPayloadValue(logMode.value === 'measured' ? computeMacroTotalFromMeasured(carbohydratesInput.value) : carbohydratesInput.value)
+  const fat = normalizeMacroPayloadValue(logMode.value === 'measured' ? computeMacroTotalFromMeasured(fatInput.value) : fatInput.value)
   const base = {
     id: draft.value.id,
     name: String(draft.value.name || '').trim(),
@@ -664,6 +664,13 @@ function toPayload() {
     usePer100g: false,
     caloriesPer100g: null
   }
+}
+
+function normalizeMacroPayloadValue(value) {
+  if (value === null || value === undefined || value === '') return null
+  const numeric = Number(value)
+  if (!Number.isFinite(numeric) || numeric < 0) return null
+  return numeric
 }
 
 function computeMacroTotalFromMeasured(densityValue) {
