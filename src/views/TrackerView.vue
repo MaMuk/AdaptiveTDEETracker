@@ -254,54 +254,48 @@
       </div>
 
       <div class="carousel-container">
-        <transition
-          :name="transitionName"
-          mode="out-in"
+        <q-card
+          class="day-card elevation-4"
+          :class="{ 'day-card--changed': isDateChangeEffectActive }"
+          data-tour="tracking-fields-card"
         >
-          <q-card
-            :key="selectedDate"
-            class="day-card elevation-4"
-            data-tour="tracking-fields-card"
-          >
-            <q-inner-loading :showing="isLoading" />
-            <q-card-section>
-              <div class="text-subtitle1 text-center q-mb-sm">
-                {{ formatDate(selectedDate) }}
+          <q-card-section>
+            <div class="text-subtitle1 text-center q-mb-sm">
+              {{ formatDate(selectedDate) }}
+            </div>
+            <div class="row q-col-gutter-sm">
+              <div class="col-6">
+                <q-input
+                  v-model.number="currentWeight"
+                  data-tour="weight-input"
+                  type="number"
+                  :label="`Weight (${bodyWeightUnitLabel})`"
+                  filled
+                  dense
+                  step="0.1"
+                />
               </div>
-              <div class="row q-col-gutter-sm">
-                <div class="col-6">
-                  <q-input
-                    v-model.number="currentWeight"
-                    data-tour="weight-input"
-                    type="number"
-                    :label="`Weight (${bodyWeightUnitLabel})`"
-                    filled
-                    dense
-                    step="0.1"
-                  />
-                </div>
-                <div class="col-6">
-                  <q-input
-                    v-model.number="currentCalories"
-                    data-tour="calories-input"
-                    type="number"
-                    label="Calories"
-                    filled
-                    dense
-                    step="1"
-                  />
-                </div>
+              <div class="col-6">
+                <q-input
+                  v-model.number="currentCalories"
+                  data-tour="calories-input"
+                  type="number"
+                  label="Calories"
+                  filled
+                  dense
+                  step="1"
+                />
               </div>
-              <q-btn
-                data-tour="save-entry-btn"
-                label="Save Entry"
-                color="primary"
-                class="full-width q-mt-sm"
-                @click="saveLog"
-              />
-            </q-card-section>
-          </q-card>
-        </transition>
+            </div>
+            <q-btn
+              data-tour="save-entry-btn"
+              label="Save Entry"
+              color="primary"
+              class="full-width q-mt-sm"
+              @click="saveLog"
+            />
+          </q-card-section>
+        </q-card>
       </div>
     </div>
 
@@ -309,118 +303,113 @@
       v-if="store.foodDiaryEnabled"
       class="q-mb-md"
     >
-      <transition
-        :name="transitionName"
-        mode="out-in"
-      >
-        <q-card :key="`summary-${selectedDate}`">
-          <q-card-section>
-            <div class="row items-center justify-between q-mb-sm diary-summary-header">
-              <div class="text-h6 q-mb-xs">
-                Diary Summary
-              </div>
-              <div class="summary-overall-bar">
-                <CalorieBudgetBar
-                  :consumed="dayDiaryCalories"
-                  :target="totalDailyBudget"
-                  :gain-mode="isGainMode"
-                  max-width="220px"
-                  size="18px"
-                />
-              </div>
+      <q-card>
+        <q-card-section>
+          <div class="row items-center justify-between q-mb-sm diary-summary-header">
+            <div class="text-h6 q-mb-xs">
+              Diary Summary
             </div>
+            <div class="summary-overall-bar">
+              <CalorieBudgetBar
+                :consumed="dayDiaryCalories"
+                :target="totalDailyBudget"
+                :gain-mode="isGainMode"
+                max-width="220px"
+                size="18px"
+              />
+            </div>
+          </div>
 
-            <div class="diary-summary-actions q-mb-sm">
-              <q-btn
-                class="diary-summary-btn"
-                color="primary"
-                unelevated
-                icon="add"
-                label="Add Entry"
-                @click="openTrackerEntryDialog('')"
-              />
-              <q-btn
-                class="diary-summary-btn"
-                outline
-                color="primary"
-                icon="open_in_new"
-                label="Open Diary"
-                @click="openDiaryForSection('')"
-              />
+          <div class="diary-summary-actions q-mb-sm">
+            <q-btn
+              class="diary-summary-btn"
+              color="primary"
+              unelevated
+              icon="add"
+              label="Add Entry"
+              @click="openTrackerEntryDialog('')"
+            />
+            <q-btn
+              class="diary-summary-btn"
+              outline
+              color="primary"
+              icon="open_in_new"
+              label="Open Diary"
+              @click="openDiaryForSection('')"
+            />
+          </div>
+          <div class="row items-center justify-between q-mb-sm diary-summary-date-row">
+            <div class="text-caption">
+              Date: {{ formatDate(selectedDate) }}
             </div>
-            <div class="row items-center justify-between q-mb-sm diary-summary-date-row">
-              <div class="text-caption">
-                Date: {{ formatDate(selectedDate) }}
-              </div>
-              <q-btn
-                dense
-                flat
-                color="primary"
-                class="diary-summary-toggle-btn"
-                :icon="isDiarySummaryCollapsed ? 'expand_more' : 'expand_less'"
-                :label="isDiarySummaryCollapsed ? 'Expand Summary' : 'Collapse Summary'"
-                @click="isDiarySummaryCollapsed = !isDiarySummaryCollapsed"
-              />
-            </div>
+            <q-btn
+              dense
+              flat
+              color="primary"
+              class="diary-summary-toggle-btn"
+              :icon="isDiarySummaryCollapsed ? 'expand_more' : 'expand_less'"
+              :label="isDiarySummaryCollapsed ? 'Expand Summary' : 'Collapse Summary'"
+              @click="isDiarySummaryCollapsed = !isDiarySummaryCollapsed"
+            />
+          </div>
 
-            <div v-if="!isDiarySummaryCollapsed">
-              <div
-                v-if="dayDiaryEntries.length === 0"
-                class="text-grey-7 q-mb-sm"
-              >
-                No diary entries for this day yet.
-              </div>
-              <div
-                v-for="group in diarySummaryGroups"
-                :key="group.key"
-                class="q-mb-sm"
-              >
-                <div class="row items-center justify-between q-mb-xs">
-                  <div class="text-subtitle2">
-                    {{ group.label }}
-                  </div>
+          <div v-if="!isDiarySummaryCollapsed">
+            <div
+              v-if="dayDiaryEntries.length === 0"
+              class="text-grey-7 q-mb-sm"
+            >
+              No diary entries for this day yet.
+            </div>
+            <div
+              v-for="group in diarySummaryGroups"
+              :key="group.key"
+              class="q-mb-sm"
+            >
+              <div class="row items-center justify-between q-mb-xs">
+                <div class="text-subtitle2">
+                  {{ group.label }}
                 </div>
-                <CalorieBudgetBar
-                  :consumed="group.calories"
-                  :target="group.targetCalories"
-                  :gain-mode="isGainMode"
-                  max-width="320px"
-                  size="16px"
-                />
-                <q-list
-                  bordered
-                  separator
-                >
-                  <q-item
-                    v-for="entry in group.entries"
-                    :key="entry.id"
-                  >
-                    <q-item-section>
-                      <q-item-label>{{ entry.name }}</q-item-label>
-                      <q-item-label caption>
-                        {{ entry.amount || 'No amount' }} • {{ entry.calories }} kcal
-                      </q-item-label>
-                    </q-item-section>
-                  </q-item>
-                </q-list>
               </div>
-            </div>
-
-            <div class="row items-center justify-between q-gutter-sm q-mt-md diary-summary-footer">
-              <div class="text-subtitle1">
-                Diary Total: {{ dayDiaryCalories }} kcal
-              </div>
-              <q-btn
-                class="diary-summary-complete-btn"
-                color="primary"
-                label="Mark Day Complete"
-                :disable="dayDiaryEntries.length === 0"
-                @click="commitDiaryToDailyLog"
+              <CalorieBudgetBar
+                :consumed="group.calories"
+                :target="group.targetCalories"
+                :gain-mode="isGainMode"
+                max-width="320px"
+                size="16px"
               />
+              <q-list
+                bordered
+                separator
+              >
+                <q-item
+                  v-for="entry in group.entries"
+                  :key="entry.id"
+                >
+                  <q-item-section>
+                    <q-item-label>{{ entry.name }}</q-item-label>
+                    <q-item-label caption>
+                      {{ entry.amount || 'No amount' }} • {{ entry.calories }} kcal
+                    </q-item-label>
+                  </q-item-section>
+                </q-item>
+              </q-list>
             </div>
-          </q-card-section>
-        </q-card>
-      </transition>
+          </div>
+
+          <div class="row items-center justify-between q-gutter-sm q-mt-md diary-summary-footer">
+            <div class="text-subtitle1">
+              Diary Total: {{ dayDiaryCalories }} kcal
+            </div>
+            <q-btn
+              class="diary-summary-complete-btn"
+              color="primary"
+              label="Mark Day Complete"
+              :disable="dayDiaryEntries.length === 0"
+              @click="commitDiaryToDailyLog"
+            />
+          </div>
+        </q-card-section>
+      </q-card>
     </div>
 
     <QDialog v-model="showDatePicker">
@@ -488,7 +477,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '../stores/user'
 import { date as qDate, useQuasar } from 'quasar'
@@ -507,8 +496,6 @@ const $q = useQuasar()
 
 const selectedDate = ref(todayKey())
 const showDatePicker = ref(false)
-const transitionName = ref('slide-left')
-const isLoading = ref(false)
 const showDeleteDialog = ref(false)
 const dateToDelete = ref(null)
 const showCalorieBreakdown = ref(false)
@@ -521,6 +508,7 @@ const trackerEntrySection = ref('')
 
 const currentWeight = ref(null)
 const currentCalories = ref(null)
+const isDateChangeEffectActive = ref(false)
 const isDiarySummaryCollapsed = ref(true)
 const isTourMockMode = computed(() => route.query.tourMock === '1')
 const SEVEN_DAY_DELTA_WARNING_DISMISS_KEY = 'tdee_tracker_seven_day_delta_warning_dismissed_until'
@@ -563,8 +551,27 @@ function loadDateData() {
 }
 
 loadDateData()
-watch(selectedDate, () => loadDateData())
+let dateChangeEffectTimeout = null
+
+function triggerDateChangeEffect() {
+  isDateChangeEffectActive.value = false
+  requestAnimationFrame(() => {
+    isDateChangeEffectActive.value = true
+  })
+  if (dateChangeEffectTimeout) clearTimeout(dateChangeEffectTimeout)
+  dateChangeEffectTimeout = setTimeout(() => {
+    isDateChangeEffectActive.value = false
+  }, 760)
+}
+
+watch(selectedDate, () => {
+  loadDateData()
+  triggerDateChangeEffect()
+})
 watch(profileMeasurementSystem, () => loadDateData())
+onBeforeUnmount(() => {
+  if (dateChangeEffectTimeout) clearTimeout(dateChangeEffectTimeout)
+})
 isDevModeEnabled.value = localStorage.getItem('tdee_dev_mode_enabled') === 'true'
 dismissedSevenDayDeltaWarningUntil.value = Number(localStorage.getItem(SEVEN_DAY_DELTA_WARNING_DISMISS_KEY)) || 0
 
@@ -912,32 +919,15 @@ const tdeeConfidenceHint = computed(() => {
 })
 
 function previousDay() {
-  transitionName.value = 'slide-right'
-  isLoading.value = true
-  setTimeout(() => {
-    selectedDate.value = previousDayDate.value
-    isLoading.value = false
-  }, 150)
+  selectedDate.value = previousDayDate.value
 }
 
 function nextDay() {
-  transitionName.value = 'slide-left'
-  isLoading.value = true
-  setTimeout(() => {
-    selectedDate.value = nextDayDate.value
-    isLoading.value = false
-  }, 150)
+  selectedDate.value = nextDayDate.value
 }
 
 function jumpToDate(date) {
-  const current = parseDateKey(selectedDate.value)
-  const target = parseDateKey(date)
-  transitionName.value = target > current ? 'slide-left' : 'slide-right'
-  isLoading.value = true
-  setTimeout(() => {
-    selectedDate.value = date
-    isLoading.value = false
-  }, 150)
+  selectedDate.value = date
 }
 
 function onDateSelected() {
@@ -1053,36 +1043,62 @@ function deleteEntry() {
 }
 
 .day-card {
+  position: relative;
   width: 100%;
   max-width: 500px;
   margin: 0 auto;
+  overflow: visible;
 }
 
-.slide-left-enter-active,
-.slide-left-leave-active,
-.slide-right-enter-active,
-.slide-right-leave-active {
-  transition: all 0.25s ease-out;
-}
-
-.slide-left-enter-from {
-  transform: translateX(100%);
+.day-card::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  pointer-events: none;
   opacity: 0;
+  box-shadow:
+    0 0 0 1px rgba(255, 213, 0, 0),
+    0 0 0 rgba(255, 213, 0, 0),
+    0 0 0 rgba(255, 213, 0, 0);
 }
 
-.slide-left-leave-to {
-  transform: translateX(-100%);
-  opacity: 0;
+.day-card--changed {
 }
 
-.slide-right-enter-from {
-  transform: translateX(-100%);
-  opacity: 0;
+.day-card--changed::after {
+  animation: day-card-date-change-glow 0.72s cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 
-.slide-right-leave-to {
-  transform: translateX(100%);
-  opacity: 0;
+@keyframes day-card-date-change-glow {
+  0% {
+    opacity: 0;
+    box-shadow:
+      0 0 0 1px rgba(255, 213, 0, 0),
+      0 0 0 rgba(255, 213, 0, 0),
+      0 0 0 rgba(255, 213, 0, 0);
+  }
+  35% {
+    opacity: 1;
+    box-shadow:
+      0 0 0 2px rgba(255, 213, 0, 0.72),
+      0 0 16px rgba(255, 213, 0, 0.42),
+      0 0 28px rgba(50, 87, 167, 0.24);
+  }
+  68% {
+    opacity: 0.7;
+    box-shadow:
+      0 0 0 1px rgba(255, 213, 0, 0.5),
+      0 0 10px rgba(255, 213, 0, 0.3),
+      0 0 18px rgba(50, 87, 167, 0.16);
+  }
+  100% {
+    opacity: 0;
+    box-shadow:
+      0 0 0 1px rgba(255, 213, 0, 0),
+      0 0 0 rgba(255, 213, 0, 0),
+      0 0 0 rgba(255, 213, 0, 0);
+  }
 }
 
 .summary-overall-bar {
