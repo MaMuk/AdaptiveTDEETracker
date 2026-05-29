@@ -27,14 +27,28 @@
     :disable="!foodDiaryEnabled"
     @update:model-value="emit('update:openAiApiKey', String($event || ''))"
   />
+  <q-banner
+    v-if="showOpenAiPrivacyWarning"
+    dense
+    rounded
+    class="bg-warning text-black q-mt-sm"
+  >
+    Privacy warning: when AI mode is enabled with an OpenAI API key, meal data and images are sent to OpenAI and may be stored/retained by OpenAI according to your account settings and OpenAI policies.
+  </q-banner>
 </template>
 
 <script setup>
-defineProps({
+import { computed } from 'vue'
+
+const props = defineProps({
   foodDiaryEnabled: { type: Boolean, default: false },
   aiEnabled: { type: Boolean, default: false },
   openAiApiKey: { type: String, default: '' }
 })
+
+const showOpenAiPrivacyWarning = computed(
+  () => props.aiEnabled && props.openAiApiKey.trim().length > 0
+)
 
 const emit = defineEmits([
   'update:aiEnabled',

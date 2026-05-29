@@ -14,11 +14,12 @@ The Adaptive TDEE Tracker is a Vue 3-based mobile application that implements an
 - **Weight Trend Analysis**: View statistics and trends over time
 - **Optional Food Diary**: Keep per-day meal rows by section
 - **Suggestions Library**: Reuse common foods with section-aware ranking and search
-- **Offline-First**: All data is stored locally on your device
+- **Offline-First by Default**: Core tracker/diary data stays local; optional AI recognition sends request data to OpenAI when enabled
 
 **Current Status:**
-- Currently uses metric units (kg, cm)
-- Unit configuration (imperial/metric) is planned for a future release
+- Supports both metric and imperial units via improved units mode
+- Unit-aware conversions/entry are applied across profile, logs, and diary/suggestions
+- Improved units mode supports common serving inputs such as servings, tsp, tbsp, cups, and similar household units
 
 **Tech Stack:**
 - **Framework**: Vue 3
@@ -57,7 +58,7 @@ The Adaptive TDEE Tracker is a Vue 3-based mobile application that implements an
      - Name
      - Amount
      - Calories
-     - Optional kcal-per-100g mode for auto-calculation from grams
+     - Optional density mode (`kcal/100g` or `100g/kcal`, depending on units mode) for auto-calculation from entered amounts
    - Use **Load Suggestions** to quickly reuse foods
 
 5. **Suggestions Library**:
@@ -79,7 +80,7 @@ The Suggestions screen uses a table-based editor for reusable foods.
   - Name
   - Amount
   - Calories
-  - kcal/100g mode fields (when enabled per item)
+  - density mode fields (`kcal/100g` / `100g/kcal` nomenclature in improved units mode)
   - Notes
   - Tags
 - Typical actions:
@@ -112,6 +113,17 @@ The Suggestions screen uses a table-based editor for reusable foods.
      - You choose where to save/send the JSON (Downloads, Drive, mail, etc.)
    - Backups are local files and can be used to move data between devices
 
+8. **CSV Export for Spreadsheet Comparison**:
+   - Convert a JSON backup to a spreadsheet-friendly CSV:
+     ```bash
+     npm run export:sheet-csv -- --input tdee-backup-YYYY-MM-DD.json
+     ```
+   - Optional output filename:
+     ```bash
+     npm run export:sheet-csv -- --input tdee-backup-YYYY-MM-DD.json --output my-log.csv
+     ```
+   - The CSV can be pasted into a widely used adaptive TDEE tracker spreadsheet template to compare in-app estimates with spreadsheet estimates.
+
 ### Experimental AI Flows
 
 - **Diary AI (Recognize Meal)**:
@@ -130,7 +142,7 @@ The Suggestions screen uses a table-based editor for reusable foods.
     - name
     - amount
     - calories
-    - calories-per-100g mode
+    - density mode (`kcal/100g` or `100g/kcal`, depending on units mode)
   - Final save adds to Suggestions, not directly to Diary
 
 - **Demo Mode**:
@@ -138,6 +150,8 @@ The Suggestions screen uses a table-based editor for reusable foods.
 
 - **Privacy and Scope**:
   - No image is stored in persistent app state or diary entries
+  - If you configure an OpenAI API key, request payloads are sent to OpenAI for processing
+  - OpenAI may retain/store submitted data according to your OpenAI account settings and OpenAI policies
   - Feature is experimental and intended as a speed/orientation aid
   - Calorie-only focus (no macro tracking)
 
