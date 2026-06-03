@@ -76,14 +76,6 @@
           label="Back"
           @click="router.push('/')"
         />
-        <q-btn
-          v-if="store.aiMealRecognitionEnabled"
-          class="ai-magic-btn"
-          unelevated
-          icon="auto_awesome"
-          label="Recognize Meal"
-          @click="openRecognition"
-        />
       </q-card-actions>
       <q-card-section class="q-pt-none">
         <div class="text-caption q-mb-xs">
@@ -269,15 +261,24 @@
               Total tracked: {{ formatMacroWithUnit(macroDistribution.totalTrackedGrams) }}
             </div>
             <div class="text-caption macro-legend-row">
-              <span class="macro-legend-swatch macro-legend-protein" aria-hidden="true" />
+              <span
+                class="macro-legend-swatch macro-legend-protein"
+                aria-hidden="true"
+              />
               Protein: {{ formatMacroDistributionLine(macroDistribution.protein) }}
             </div>
             <div class="text-caption macro-legend-row">
-              <span class="macro-legend-swatch macro-legend-carbohydrates" aria-hidden="true" />
+              <span
+                class="macro-legend-swatch macro-legend-carbohydrates"
+                aria-hidden="true"
+              />
               Carbohydrates: {{ formatMacroDistributionLine(macroDistribution.carbohydrates) }}
             </div>
             <div class="text-caption macro-legend-row">
-              <span class="macro-legend-swatch macro-legend-fat" aria-hidden="true" />
+              <span
+                class="macro-legend-swatch macro-legend-fat"
+                aria-hidden="true"
+              />
               Fat: {{ formatMacroDistributionLine(macroDistribution.fat) }}
             </div>
           </div>
@@ -315,8 +316,11 @@
       :measurement-units="store.measurementUnits"
       :measurement-unit-multipliers="store.measurementUnitMultipliers"
       :show-macro-fields="store.diaryMacroTrackingEnabled"
+      :ai-recognition-enabled="store.aiMealRecognitionEnabled"
+      ai-recognition-label="Recognize Meal"
       @save="saveEntryFromDialog"
       @open-suggestion-picker="openSuggestionPicker($event, true)"
+      @open-ai-recognition="openRecognitionFromDialog"
     />
 
     <QDialog v-model="showSuggestionPicker">
@@ -1024,8 +1028,11 @@ function formatDate(dateString) {
   return qDate.formatDate(dateString, 'MMM D, YYYY')
 }
 
-function openRecognition() {
-  router.push({ path: '/diary/ai-recognition', query: { date: selectedDate.value } })
+function openRecognitionFromDialog(section) {
+  router.push({
+    path: '/diary/ai-recognition',
+    query: { date: selectedDate.value, section: section || '' }
+  })
 }
 
 ensureBudgetSnapshot(selectedDate.value)

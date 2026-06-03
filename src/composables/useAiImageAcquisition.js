@@ -7,29 +7,52 @@ export function useAiImageAcquisition({
   isBusy,
   onError,
   onWarning,
-  onAfterImageSelected
+  onAfterImageSelected,
+  maxSelectedImages,
+  appendOnCameraCapture
 }) {
   const cameraInputRef = ref(null)
   const galleryInputRef = ref(null)
   const selectedImageDataUrl = ref('')
+  const selectedImageDataUrls = ref([])
   const isOpeningCamera = ref(false)
 
   function clearTransientImageData() {
     selectedImageDataUrl.value = ''
+    selectedImageDataUrls.value = []
   }
 
-  function onImageSelected(file) {
+  function removeSelectedImageAt(index) {
+    const idx = Number(index)
+    if (!Number.isInteger(idx) || idx < 0 || idx >= selectedImageDataUrls.value.length) return
+    selectedImageDataUrls.value.splice(idx, 1)
+    selectedImageDataUrl.value = selectedImageDataUrls.value[0] || ''
+  }
+
+  function onImageSelected(file, { append = false } = {}) {
     if (typeof onError === 'function') onError('')
     if (typeof onAfterImageSelected === 'function') onAfterImageSelected()
 
     if (!file) {
+      if (!append) clearTransientImageData()
       selectedImageDataUrl.value = ''
       return
     }
 
     const reader = new FileReader()
     reader.onload = () => {
-      selectedImageDataUrl.value = String(reader.result || '')
+      const dataUrl = String(reader.result || '')
+      const maxImages = Number(maxSelectedImages?.value ?? maxSelectedImages)
+      if (!append) {
+        selectedImageDataUrls.value = dataUrl ? [dataUrl] : []
+      } else if (dataUrl) {
+        if (Number.isFinite(maxImages) && maxImages > 0 && selectedImageDataUrls.value.length >= maxImages) {
+          selectedImageDataUrl.value = selectedImageDataUrls.value[0] || ''
+          return
+        }
+        selectedImageDataUrls.value.push(dataUrl)
+      }
+      selectedImageDataUrl.value = selectedImageDataUrls.value[0] || ''
     }
     reader.onerror = () => {
       if (typeof onError === 'function') onError('Could not read selected image.')
@@ -44,7 +67,9 @@ export function useAiImageAcquisition({
 
     try {
       if (Capacitor.isPluginAvailable('Camera')) {
-        const captured = await tryCaptureWithCapacitorCamera()
+        const captured = await tryCaptureWithCapacitorCamera({
+          append: Boolean(appendOnCameraCapture?.value ?? appendOnCameraCapture)
+        })
         if (!captured && typeof onWarning === 'function') {
           onWarning('No photo captured.')
         }
@@ -67,14 +92,28 @@ export function useAiImageAcquisition({
   }
 
   function onFileInputChange(event) {
-    const file = event?.target?.files?.[0] || null
-    onImageSelected(file)
+    const files = Array.from(event?.target?.files || [])
+    const shouldAppend = event?.target?.hasAttribute('multiple')
+    const maxImages = Number(maxSelectedImages?.value ?? maxSelectedImages)
+    if (files.length === 0) {
+      onImageSelected(null, { append: shouldAppend })
+    } else {
+      files.forEach((file, index) => {
+        if (
+          shouldAppend
+          && Number.isFinite(maxImages)
+          && maxImages > 0
+          && selectedImageDataUrls.value.length >= maxImages
+        ) return
+        onImageSelected(file, { append: shouldAppend || index > 0 })
+      })
+    }
     if (event?.target) {
       event.target.value = ''
     }
   }
 
-  async function tryCaptureWithCapacitorCamera() {
+  async function tryCaptureWithCapacitorCamera(options = {}) {
     try {
       const photo = await Camera.getPhoto({
         quality: 80,
@@ -83,7 +122,9 @@ export function useAiImageAcquisition({
       })
       const resolvedDataUrl = await resolvePhotoToDataUrl(photo)
       if (resolvedDataUrl) {
-        onImageSelected(dataUrlToFile(resolvedDataUrl, 'camera-photo.jpg'))
+        onImageSelected(dataUrlToFile(resolvedDataUrl, 'camera-photo.jpg'), {
+          append: Boolean(options.append)
+        })
         return true
       }
       return false
@@ -129,15 +170,31 @@ export function useAiImageAcquisition({
     return await preprocessImageDataUrl(selectedImageDataUrl.value, options)
   }
 
+  async function getPreprocessedSelectedImages(options = { maxDimension: 1024, quality: 0.75 }) {
+    const urls = Array.isArray(selectedImageDataUrls.value) ? selectedImageDataUrls.value : []
+    if (urls.length === 0) return []
+    const processed = await Promise.all(urls.map(async (dataUrl) => {
+      try {
+        return await preprocessImageDataUrl(dataUrl, options)
+      } catch {
+        return null
+      }
+    }))
+    return processed.filter(item => item?.dataUrl)
+  }
+
   return {
     cameraInputRef,
     galleryInputRef,
     selectedImageDataUrl,
+    selectedImageDataUrls,
     isOpeningCamera,
     clearTransientImageData,
+    removeSelectedImageAt,
     onFileInputChange,
     openCameraPicker,
     openGalleryPicker,
-    getPreprocessedSelectedImage
+    getPreprocessedSelectedImage,
+    getPreprocessedSelectedImages
   }
 }

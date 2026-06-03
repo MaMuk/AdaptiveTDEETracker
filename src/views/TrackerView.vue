@@ -433,8 +433,11 @@
       :measurement-units="store.measurementUnits"
       :measurement-unit-multipliers="store.measurementUnitMultipliers"
       :show-macro-fields="store.diaryMacroTrackingEnabled"
+      :ai-recognition-enabled="store.aiMealRecognitionEnabled"
+      ai-recognition-label="Recognize Meal"
       @save="saveTrackerEntry"
       @open-suggestion-picker="openDiaryForSection($event)"
+      @open-ai-recognition="openDiaryRecognitionFromDialog"
     />
 
     <QDialog v-model="showDeleteDialog">
@@ -959,6 +962,13 @@ function openTrackerEntryDialog(section = '') {
   trackerEntryRow.value = null
   trackerEntrySection.value = section || ''
   showTrackerEntryDialog.value = true
+}
+
+function openDiaryRecognitionFromDialog(section) {
+  router.push({
+    path: '/diary/ai-recognition',
+    query: { date: selectedDate.value, section: section || '' }
+  })
 }
 
 function saveTrackerEntry(payload) {

@@ -73,13 +73,17 @@ export class OpenAiMealRecognitionProvider extends AiMealRecognitionProvider {
   async recognizeMealFromImage(input) {
     const apiKey = String(input?.apiKey || '').trim()
     const imageDataUrl = String(input?.imageDataUrl || '')
+    const imageDataUrls = Array.isArray(input?.imageDataUrls)
+      ? input.imageDataUrls.map(item => String(item || '')).filter(Boolean)
+      : []
     const prompt = buildPrompt({
       context: input?.context,
       isNutritionLabel: Boolean(input?.isNutritionLabel),
       userContext: input?.userContext
     })
+    const allImages = imageDataUrls.length > 0 ? imageDataUrls : (imageDataUrl ? [imageDataUrl] : [])
 
-    if (!imageDataUrl) {
+    if (allImages.length === 0) {
       throw new Error('No image selected.')
     }
 
@@ -120,6 +124,8 @@ export class OpenAiMealRecognitionProvider extends AiMealRecognitionProvider {
       }, 'openai-demo')
     }
 
+    const imageInputs = allImages.map(url => ({ type: 'input_image', image_url: url }))
+
     const response = await fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
       headers: {
@@ -133,7 +139,7 @@ export class OpenAiMealRecognitionProvider extends AiMealRecognitionProvider {
             role: 'user',
             content: [
               { type: 'input_text', text: prompt },
-              { type: 'input_image', image_url: imageDataUrl }
+              ...imageInputs
             ]
           }
         ],

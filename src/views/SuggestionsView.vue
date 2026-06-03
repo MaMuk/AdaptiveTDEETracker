@@ -219,14 +219,6 @@
               label="Add Suggestion"
               @click="openAddSuggestionDialog"
             />
-            <q-btn
-              v-if="store.aiMealRecognitionEnabled"
-              class="ai-magic-btn"
-              unelevated
-              icon="auto_awesome"
-              label="Recognize to Add"
-              @click="router.push('/suggestions/ai-recognition')"
-            />
           </div>
           <q-pagination
             v-model="page"
@@ -249,9 +241,12 @@
       :enable-suggestion-picker="false"
       :show-metadata-fields="true"
       :show-macro-fields="store.diaryMacroTrackingEnabled"
+      :ai-recognition-enabled="store.aiMealRecognitionEnabled"
+      ai-recognition-label="Recognize to Add"
       :measurement-units="store.measurementUnits"
       :measurement-unit-multipliers="store.measurementUnitMultipliers"
       @save="saveSuggestionFromDialog"
+      @open-ai-recognition="openSuggestionRecognition"
     />
   </q-page>
 </template>
@@ -440,5 +435,10 @@ function remove(item) {
   }).onOk(() => {
     store.deleteSuggestion(item.id)
   })
+}
+
+function openSuggestionRecognition() {
+  showSuggestionDialog.value = false
+  router.push('/suggestions/ai-recognition')
 }
 </script>

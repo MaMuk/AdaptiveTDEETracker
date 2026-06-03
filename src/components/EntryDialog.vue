@@ -237,18 +237,27 @@
             </div>
           </div>
 
-          <div
-            v-if="enableSuggestionPicker"
-            class="col-12"
-          >
-            <q-btn
-              dense
-              flat
-              color="dark"
-              icon="history"
-              label="Open Suggestion Picker"
-              @click="$emit('open-suggestion-picker', draft.section)"
-            />
+          <div class="col-12">
+            <div class="row q-gutter-sm">
+              <q-btn
+                v-if="enableSuggestionPicker"
+                dense
+                flat
+                color="dark"
+                icon="history"
+                label="Open Suggestion Picker"
+                @click="$emit('open-suggestion-picker', draft.section)"
+              />
+              <q-btn
+                v-if="aiRecognitionEnabled"
+                class="ai-magic-btn"
+                dense
+                unelevated
+                icon="auto_awesome"
+                :label="aiRecognitionLabel"
+                @click="$emit('open-ai-recognition', draft.section)"
+              />
+            </div>
           </div>
         </div>
       </q-card-section>
@@ -290,13 +299,15 @@ const props = defineProps({
   title: { type: String, default: '' },
   saveLabel: { type: String, default: 'Save' },
   enableSuggestionPicker: { type: Boolean, default: true },
+  aiRecognitionEnabled: { type: Boolean, default: false },
+  aiRecognitionLabel: { type: String, default: 'Recognize with AI' },
   showMetadataFields: { type: Boolean, default: false },
   showMacroFields: { type: Boolean, default: false },
   measurementUnits: { type: Array, default: () => ['g', 'ml', 'serving'] },
   measurementUnitMultipliers: { type: Object, default: () => ({}) }
 })
 
-const emit = defineEmits(['update:modelValue', 'save', 'open-suggestion-picker'])
+const emit = defineEmits(['update:modelValue', 'save', 'open-suggestion-picker', 'open-ai-recognition'])
 const $q = useQuasar()
 
 const logModeOptions = [
