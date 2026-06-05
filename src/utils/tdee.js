@@ -210,12 +210,12 @@ export function computeCalorieTarget(maintenanceCalories, weeklyRateKg, context 
   return Math.max(MIN_RECOMMENDED_CALORIES, target)
 }
 
-export function calculateAdaptiveTDEE(logs = [], baselineTDEE = null) {
+export function calculateAdaptiveTDEE(logs = [], baselineTDEE = null, startWeightKg = null) {
   const baseline = Number.isFinite(Number(baselineTDEE))
     ? roundToStep(Number(baselineTDEE), 25)
     : estimateInitialTDEE(DEFAULT_START_WEIGHT_KG)
 
-  const maintenanceCalories = calculateLoggedMaintenanceCalories(logs, null)
+  const maintenanceCalories = calculateLoggedMaintenanceCalories(logs, startWeightKg)
   const completeLogCount = getCompleteLogs(logs).length
 
   return {

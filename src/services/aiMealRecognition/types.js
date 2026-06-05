@@ -37,6 +37,7 @@ function sanitizeGuess(rawGuess, provider) {
     name,
     calories,
     caloriesPer100,
+    caloriesPer100g: caloriesPer100,
     caloriesPer100Basis,
     protein,
     carbohydrates,

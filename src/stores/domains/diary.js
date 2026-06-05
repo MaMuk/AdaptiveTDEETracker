@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, watch } from 'vue'
 import { useSuggestionsStore } from './suggestions'
 import { withLegacyDensityFields, normalizeDensityFields } from '../../utils/nutritionDensity'
+import { readJsonStorage } from '../../utils/storage'
 
 const STORAGE_KEY = 'tdee_diary_store'
 const DEFAULT_SECTIONS = ['Breakfast', 'Lunch', 'Dinner', 'Snacks']
@@ -246,25 +247,23 @@ export const useDiaryStore = defineStore('diary', () => {
         diaryBudgetSnapshotsByDate.value = {}
     }
 
-    if (localStorage.getItem(STORAGE_KEY)) {
-        const stored = JSON.parse(localStorage.getItem(STORAGE_KEY))
-        if (stored) {
-            foodDiaryEnabled.value = Boolean(stored.foodDiaryEnabled)
-            diaryMacroTrackingEnabled.value = Boolean(stored.diaryMacroTrackingEnabled)
-            diarySections.value = Array.isArray(stored.diarySections) && stored.diarySections.length > 0
-                ? stored.diarySections
-                : [...DEFAULT_SECTIONS]
-            foodDiaryEntries.value = Array.isArray(stored.foodDiaryEntries)
-                ? stored.foodDiaryEntries.map(entry => ({
-                    ...withLegacyDensityFields(entry),
-                    ...normalizeMacroFields(entry)
-                }))
-                : []
-            const legacySections = getLegacyDiarySections(foodDiaryEntries.value, diarySections.value)
-            diarySectionPercentages.value = sanitizeSectionPercentages(stored.diarySectionPercentages, diarySections.value, legacySections)
-            diaryClosedSectionsByDate.value = sanitizeClosedSectionsByDate(stored.diaryClosedSectionsByDate, diarySections.value, legacySections)
-            diaryBudgetSnapshotsByDate.value = sanitizeDiaryBudgetSnapshots(stored.diaryBudgetSnapshotsByDate, diarySections.value, legacySections)
-        }
+    const stored = readJsonStorage(STORAGE_KEY)
+    if (stored) {
+        foodDiaryEnabled.value = Boolean(stored.foodDiaryEnabled)
+        diaryMacroTrackingEnabled.value = Boolean(stored.diaryMacroTrackingEnabled)
+        diarySections.value = Array.isArray(stored.diarySections) && stored.diarySections.length > 0
+            ? stored.diarySections
+            : [...DEFAULT_SECTIONS]
+        foodDiaryEntries.value = Array.isArray(stored.foodDiaryEntries)
+            ? stored.foodDiaryEntries.map(entry => ({
+                ...withLegacyDensityFields(entry),
+                ...normalizeMacroFields(entry)
+            }))
+            : []
+        const legacySections = getLegacyDiarySections(foodDiaryEntries.value, diarySections.value)
+        diarySectionPercentages.value = sanitizeSectionPercentages(stored.diarySectionPercentages, diarySections.value, legacySections)
+        diaryClosedSectionsByDate.value = sanitizeClosedSectionsByDate(stored.diaryClosedSectionsByDate, diarySections.value, legacySections)
+        diaryBudgetSnapshotsByDate.value = sanitizeDiaryBudgetSnapshots(stored.diaryBudgetSnapshotsByDate, diarySections.value, legacySections)
     }
 
     if (Object.keys(diarySectionPercentages.value).length === 0) {

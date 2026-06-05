@@ -370,6 +370,11 @@ function openEditSuggestionDialog(item) {
     name: String(item.name || ''),
     amount: String(item.amount || ''),
     calories: Number(item.calories) || 0,
+    densityMode: item.densityMode === 'per100' ? 'per100' : 'none',
+    densityBasis: item.densityBasis === 'volume' ? 'volume' : 'mass',
+    densityKcalPer100Canonical: Number.isFinite(Number(item.densityKcalPer100Canonical))
+      ? Number(item.densityKcalPer100Canonical)
+      : null,
     usePer100g: Boolean(item.usePer100g),
     caloriesPer100g: item.caloriesPer100g ?? null,
     protein: toNullableMacro(item.protein),
@@ -387,6 +392,11 @@ function saveSuggestionFromDialog(entryPayload) {
     name: String(entryPayload.name || '').trim(),
     amount: String(entryPayload.amount || '').trim(),
     calories: Number(entryPayload.calories) || 0,
+    densityMode: entryPayload.densityMode === 'per100' ? 'per100' : 'none',
+    densityBasis: entryPayload.densityBasis === 'volume' ? 'volume' : 'mass',
+    densityKcalPer100Canonical: Number.isFinite(Number(entryPayload.densityKcalPer100Canonical))
+      ? Number(entryPayload.densityKcalPer100Canonical)
+      : null,
     usePer100g: Boolean(entryPayload.usePer100g),
     caloriesPer100g: entryPayload.usePer100g ? Number(entryPayload.caloriesPer100g) : null,
     protein: toNullableMacro(entryPayload.protein),

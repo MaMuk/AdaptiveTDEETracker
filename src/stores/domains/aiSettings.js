@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, watch } from 'vue'
+import { readJsonStorage } from '../../utils/storage'
 
 const STORAGE_KEY = 'tdee_ai_settings_store'
 
@@ -20,12 +21,10 @@ export const useAiSettingsStore = defineStore('aiSettings', () => {
         openAiApiKey.value = ''
     }
 
-    if (localStorage.getItem(STORAGE_KEY)) {
-        const stored = JSON.parse(localStorage.getItem(STORAGE_KEY))
-        if (stored) {
-            aiMealRecognitionEnabled.value = Boolean(stored.aiMealRecognitionEnabled)
-            openAiApiKey.value = String(stored.openAiApiKey || '')
-        }
+    const stored = readJsonStorage(STORAGE_KEY)
+    if (stored) {
+        aiMealRecognitionEnabled.value = Boolean(stored.aiMealRecognitionEnabled)
+        openAiApiKey.value = String(stored.openAiApiKey || '')
     }
 
     watch([aiMealRecognitionEnabled, openAiApiKey], () => {

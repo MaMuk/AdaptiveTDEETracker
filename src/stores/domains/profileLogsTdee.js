@@ -7,6 +7,7 @@ import {
     calculateLoggedMaintenanceCalories,
     estimateInitialTDEE
 } from '../../utils/tdee'
+import { readJsonStorage } from '../../utils/storage'
 import { useAppSettingsStore } from './appSettings'
 
 const STORAGE_KEY = 'tdee_profile_logs_tdee_store'
@@ -132,7 +133,7 @@ export const useProfileLogsTdeeStore = defineStore('profileLogsTdee', () => {
                 manualBias
             })
             : maintenanceFromLogs
-        const result = calculateAdaptiveTDEE(logs.value, baselineTDEE.value)
+        const result = calculateAdaptiveTDEE(logs.value, baselineTDEE.value, startWeight.value)
         tdeeDetails.value = {
             ...result,
             anchorBaselineTDEE: Math.round(Number(baselineTDEE.value)),
@@ -184,21 +185,19 @@ export const useProfileLogsTdeeStore = defineStore('profileLogsTdee', () => {
         tdeeDetails.value = null
     }
 
-    if (localStorage.getItem(STORAGE_KEY)) {
-        const stored = JSON.parse(localStorage.getItem(STORAGE_KEY))
-        if (stored) {
-            startWeight.value = stored.startWeight
-            goalWeight.value = stored.goalWeight
-            height.value = stored.height
-            age.value = stored.age ?? null
-            sex.value = stored.sex === 'female' ? 'female' : 'male'
-            weeklyRate.value = stored.weeklyRate
-            logs.value = stored.logs || []
-            baselineTDEE.value = stored.baselineTDEE
-                || stored.calculatedTDEE
-                || null
-            tdeeSnapshotsByDate.value = sanitizeTdeeSnapshots(stored.tdeeSnapshotsByDate)
-        }
+    const stored = readJsonStorage(STORAGE_KEY)
+    if (stored) {
+        startWeight.value = stored.startWeight
+        goalWeight.value = stored.goalWeight
+        height.value = stored.height
+        age.value = stored.age ?? null
+        sex.value = stored.sex === 'female' ? 'female' : 'male'
+        weeklyRate.value = stored.weeklyRate
+        logs.value = stored.logs || []
+        baselineTDEE.value = stored.baselineTDEE
+            || stored.calculatedTDEE
+            || null
+        tdeeSnapshotsByDate.value = sanitizeTdeeSnapshots(stored.tdeeSnapshotsByDate)
     }
 
     ensureBaselineTDEE()

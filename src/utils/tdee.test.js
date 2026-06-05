@@ -56,12 +56,20 @@ function testCompatibilityAdaptivePayload() {
   assert.equal(result.mode, 'logged-trend')
 }
 
+function testAdaptiveTDEEUsesProvidedStartWeight() {
+  const logs = makeDailyLogs({ startDate: '2026-01-01', days: 7, startWeight: 120, endWeight: 119.5, calories: 2400 })
+  const loggedMaintenance = calculateLoggedMaintenanceCalories(logs, 120)
+  const result = calculateAdaptiveTDEE(logs, 2500, 120)
+  assert.equal(result.tdee, loggedMaintenance)
+}
+
 function run() {
   testInitialEstimate()
   testMaintenanceFromLogsReturnsNumber()
   testDailyAdjustmentRounding()
   testGoalAwareTarget()
   testCompatibilityAdaptivePayload()
+  testAdaptiveTDEEUsesProvidedStartWeight()
   console.log('tdee tests passed')
 }
 

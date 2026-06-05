@@ -827,6 +827,11 @@ function saveEntryFromDialog(payload) {
     protein: toNullableMacro(payload.protein),
     carbohydrates: toNullableMacro(payload.carbohydrates),
     fat: toNullableMacro(payload.fat),
+    densityMode: payload.densityMode === 'per100' ? 'per100' : 'none',
+    densityBasis: payload.densityBasis === 'volume' ? 'volume' : 'mass',
+    densityKcalPer100Canonical: Number.isFinite(Number(payload.densityKcalPer100Canonical))
+      ? Number(payload.densityKcalPer100Canonical)
+      : null,
     usePer100g: Boolean(payload.usePer100g),
     caloriesPer100g: payload.usePer100g ? Number(payload.caloriesPer100g) : null
   }

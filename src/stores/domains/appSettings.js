@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, watch } from 'vue'
 import { resolveSetupCompleted } from '../../utils/setupCompletion'
+import { readJsonStorage } from '../../utils/storage'
 import { getPresetUnits, getPrimaryPresetUnits, resolveUnitId } from '../../utils/unitLibrary'
 
 const STORAGE_KEY = 'tdee_app_settings_store'
@@ -195,11 +196,9 @@ export const useAppSettingsStore = defineStore('appSettings', () => {
         })
     }
 
-    if (localStorage.getItem(STORAGE_KEY)) {
-        const stored = JSON.parse(localStorage.getItem(STORAGE_KEY))
-        if (stored) {
-            appSettings.value = sanitizeAppSettings(stored)
-        }
+    const stored = readJsonStorage(STORAGE_KEY)
+    if (stored) {
+        appSettings.value = sanitizeAppSettings(stored)
     }
 
     watch([appSettings], () => {

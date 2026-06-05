@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, watch } from 'vue'
 import { normalizeDensityFields, withLegacyDensityFields } from '../../utils/nutritionDensity'
+import { readJsonStorage } from '../../utils/storage'
 
 const STORAGE_KEY = 'tdee_suggestions_store'
 
@@ -137,11 +138,9 @@ export const useSuggestionsStore = defineStore('suggestions', () => {
         foodSuggestions.value = []
     }
 
-    if (localStorage.getItem(STORAGE_KEY)) {
-        const stored = JSON.parse(localStorage.getItem(STORAGE_KEY))
-        if (stored) {
-            foodSuggestions.value = normalizeSuggestions(stored.foodSuggestions)
-        }
+    const stored = readJsonStorage(STORAGE_KEY)
+    if (stored) {
+        foodSuggestions.value = normalizeSuggestions(stored.foodSuggestions)
     }
 
     watch([foodSuggestions], () => {

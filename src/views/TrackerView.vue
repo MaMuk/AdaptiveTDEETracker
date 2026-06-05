@@ -980,6 +980,11 @@ function saveTrackerEntry(payload) {
     protein: toNullableMacro(payload.protein),
     carbohydrates: toNullableMacro(payload.carbohydrates),
     fat: toNullableMacro(payload.fat),
+    densityMode: payload.densityMode === 'per100' ? 'per100' : 'none',
+    densityBasis: payload.densityBasis === 'volume' ? 'volume' : 'mass',
+    densityKcalPer100Canonical: Number.isFinite(Number(payload.densityKcalPer100Canonical))
+      ? Number(payload.densityKcalPer100Canonical)
+      : null,
     usePer100g: Boolean(payload.usePer100g),
     caloriesPer100g: payload.usePer100g ? Number(payload.caloriesPer100g) : null
   }, { syncSuggestion: true })
@@ -998,7 +1003,9 @@ function commitDiaryToDailyLog() {
   const hasExistingCalories = existingLog && existingLog.calories !== null && existingLog.calories !== undefined
 
   const commit = () => {
-    const weightToUse = existingLog ? existingLog.weight : currentWeight.value
+    const weightToUse = existingLog
+      ? existingLog.weight
+      : (profileMeasurementSystem.value === 'imperial' ? lbToKg(currentWeight.value) : currentWeight.value)
     store.addLog(selectedDate.value, weightToUse, totalCalories)
     currentCalories.value = totalCalories
     $q.notify({ type: 'positive', message: `Saved ${totalCalories} kcal to daily log.` })

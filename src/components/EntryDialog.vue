@@ -397,6 +397,8 @@ const isDraftDirty = computed(() => {
     || logMode.value !== resolveMode(initialDraft.value)
     || measuredAmount.value !== parseMeasuredAmount(initialDraft.value).amount
     || measuredUnit.value !== parseMeasuredAmount(initialDraft.value).unit
+    || measuredEnergy.value !== initialMeasuredEnergy()
+    || caloriesDirect.value !== (Number(initialDraft.value.calories) || 0)
     || proteinInput.value !== deriveMacroInputFromEntry(initialDraft.value, 'protein')
     || carbohydratesInput.value !== deriveMacroInputFromEntry(initialDraft.value, 'carbohydrates')
     || fatInput.value !== deriveMacroInputFromEntry(initialDraft.value, 'fat')
@@ -442,6 +444,19 @@ function parseMeasuredAmount(item) {
 function hasServingMetadata(item) {
   const parsed = parseMeasuredAmount(item)
   return parsed.unit.startsWith('serv')
+}
+
+function initialMeasuredEnergy() {
+  const source = initialDraft.value
+  const parsedMeasured = parseMeasuredAmount(source)
+  if (source.densityMode === 'per100') return canonicalDensityToDisplayedEnergy(source.densityKcalPer100Canonical)
+  if (parsedMeasured.amount && hasServingMetadata(source)) {
+    const numericAmount = Number(parsedMeasured.amount)
+    return Number.isFinite(numericAmount) && numericAmount > 0
+      ? Math.round((Number(source.calories) || 0) / numericAmount)
+      : null
+  }
+  return null
 }
 
 function resolveMode(item) {
