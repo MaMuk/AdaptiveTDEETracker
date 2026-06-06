@@ -66,7 +66,7 @@
                   <div
                     class="cell-sub"
                   >
-                    {{ week.days[day]?.calories ?? '—' }}
+                    {{ formatCaloriesCell(week.days[day]?.calories) }}
                   </div>
                 </td>
               </tr>
@@ -185,6 +185,13 @@ function onCellClick(week, dayLabel) {
 function formatWeightCell(weightKg) {
   const formatted = String(props.formatBodyWeight(weightKg, 1) || '')
   return formatted.replace(/\s*(kg|lb)\s*$/i, '')
+}
+
+function formatCaloriesCell(value) {
+  const numeric = Number(value)
+  return Number.isFinite(numeric) && value !== null && value !== '' && value !== undefined
+    ? String(numeric)
+    : '—'
 }
 
 function weekBoundaryClass(weekIndex) {

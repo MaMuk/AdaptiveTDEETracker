@@ -53,6 +53,7 @@
           :age="localAge"
           :sex="localSex"
           :tdee-manual-bias="localTdeeManualBias"
+          :tdee-smoothing-window-weeks="localTdeeSmoothingWindowWeeks"
           :activity-level-options="activityLevelOptions"
           :sex-options="sexOptions"
           @update:enabled="localStartupActivityEnabled = $event"
@@ -60,6 +61,7 @@
           @update:age="localAge = $event"
           @update:sex="localSex = $event"
           @update:tdee-manual-bias="localTdeeManualBias = $event"
+          @update:tdee-smoothing-window-weeks="localTdeeSmoothingWindowWeeks = $event"
         />
       </q-card-section>
     </q-card>
@@ -190,6 +192,9 @@
         </div>
         <div class="text-caption">
           Manual bias (applied trust): {{ tdeeDebug.manualBias }}
+        </div>
+        <div class="text-caption">
+          Averaging window: {{ tdeeDebug.smoothingWindow }}
         </div>
         <div class="text-caption">
           Snapshot entries: {{ tdeeDebug.snapshotCount }}
@@ -328,6 +333,7 @@ import { useQuasar } from 'quasar'
 import { useUserStore } from '../stores/user'
 import { startGuidedProductTour } from '../services/guidedTour'
 import { getPrimaryPresetUnits } from '../utils/unitLibrary'
+import { TDEE_SMOOTHING_WINDOW_WEEKS } from '../utils/tdee'
 import packageJson from '../../package.json'
 import ProfileGoalFields from '../components/setup/ProfileGoalFields.vue'
 import StartupAssistFields from '../components/setup/StartupAssistFields.vue'
@@ -378,6 +384,7 @@ const localSectionPercentages = ref({})
 const localAiMealRecognitionEnabled = ref(false)
 const localOpenAiApiKey = ref('')
 const localTdeeManualBias = ref(0)
+const localTdeeSmoothingWindowWeeks = ref(TDEE_SMOOTHING_WINDOW_WEEKS)
 const localStartupActivityEnabled = ref(false)
 const localStartupActivityLevel = ref('low')
 const localMeasurementSystem = ref('metric')
@@ -409,6 +416,7 @@ const tdeeDebug = computed(() => {
     observedCapped: `${asRaw(details.cappedObservedTDEE)} / ${asRaw(details.observedTDEE)} kcal`,
     trustMode: `${trust} / ${details.mode || '—'} / ${details.confidence || '—'}`,
     manualBias: `${Number.isFinite(Number(details.manualBias)) ? Number(details.manualBias).toFixed(2) : '—'} -> ${Number.isFinite(Number(details.appliedManualBias)) ? Number(details.appliedManualBias).toFixed(3) : '—'} (${Number.isFinite(Number(details.effectiveTrust)) ? Number(details.effectiveTrust).toFixed(3) : '—'})`,
+    smoothingWindow: Number.isFinite(Number(details.smoothingWindowWeeks)) ? `${Math.round(Number(details.smoothingWindowWeeks))} weeks` : '—',
     snapshotCount: String(snapshotDates.length),
     latestSnapshotDate
   }
@@ -435,6 +443,7 @@ onMounted(() => {
   localAiMealRecognitionEnabled.value = store.aiMealRecognitionEnabled
   localOpenAiApiKey.value = store.openAiApiKey
   localTdeeManualBias.value = Number(store.tdeeManualBias) || 0
+  localTdeeSmoothingWindowWeeks.value = Number(store.tdeeSmoothingWindowWeeks) || TDEE_SMOOTHING_WINDOW_WEEKS
   localStartupActivityEnabled.value = Boolean(store.startupActivityEnabled)
   localStartupActivityLevel.value = store.startupActivityLevel || 'low'
   localMeasurementSystem.value = store.measurementSystem || 'metric'
@@ -521,6 +530,9 @@ watch(sectionPercentageFields, fields => {
 watch(() => store.tdeeManualBias, value => {
   localTdeeManualBias.value = Number(value) || 0
 })
+watch(() => store.tdeeSmoothingWindowWeeks, value => {
+  localTdeeSmoothingWindowWeeks.value = Number(value) || TDEE_SMOOTHING_WINDOW_WEEKS
+})
 watch(() => store.startupActivityEnabled, value => {
   localStartupActivityEnabled.value = Boolean(value)
 })
@@ -559,6 +571,7 @@ function saveSettings() {
     store.weeklyRate = localWeeklyRate.value
   }
   store.setTdeeManualBias(localTdeeManualBias.value)
+  store.setTdeeSmoothingWindowWeeks(localTdeeSmoothingWindowWeeks.value)
   store.setStartupActivityEnabled(localStartupActivityEnabled.value)
   store.setStartupActivityLevel(localStartupActivityLevel.value)
   store.setFoodDiaryEnabled(localFoodDiaryEnabled.value)

@@ -3,6 +3,8 @@ import { dateKeyToTime } from './dateKey.js'
 export const KCAL_PER_KG_WEIGHT_CHANGE = 7716.17
 export const MAINTENANCE_KCAL_PER_KG_BODY_WEIGHT = 28.66006
 export const TDEE_SMOOTHING_WINDOW_WEEKS = 12
+export const MIN_TDEE_SMOOTHING_WINDOW_WEEKS = 1
+export const MAX_TDEE_SMOOTHING_WINDOW_WEEKS = 52
 
 const DEFAULT_START_WEIGHT_KG = 70
 const MIN_RECOMMENDED_CALORIES = 0
@@ -18,6 +20,7 @@ const ACTIVITY_MULTIPLIER_BY_LEVEL = {
 }
 
 function toNumberOrNull(value) {
+  if (value === null || value === undefined || value === '') return null
   const parsed = Number(value)
   return Number.isFinite(parsed) ? parsed : null
 }
@@ -27,12 +30,44 @@ function roundToStep(value, step) {
   return Math.round(Number(value) / Number(step)) * Number(step)
 }
 
+export function sanitizeTdeeSmoothingWindowWeeks(value) {
+  const numeric = Number(value)
+  if (!Number.isFinite(numeric)) return TDEE_SMOOTHING_WINDOW_WEEKS
+  return Math.max(
+    MIN_TDEE_SMOOTHING_WINDOW_WEEKS,
+    Math.min(MAX_TDEE_SMOOTHING_WINDOW_WEEKS, Math.round(numeric))
+  )
+}
+
 function normalizeLogDate(date) {
   return String(date || '').trim().replaceAll('/', '-')
 }
 
 function toDateMs(date) {
   return dateKeyToTime(normalizeLogDate(date))
+}
+
+function formatDateKeyFromDate(date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function getMondayWeekStartKey(dateKey) {
+  const date = new Date(toDateMs(dateKey))
+  if (!Number.isFinite(date.getTime())) return ''
+  const day = date.getDay()
+  const delta = day === 0 ? 6 : day - 1
+  date.setDate(date.getDate() - delta)
+  return formatDateKeyFromDate(date)
+}
+
+function getWeekdayIndex(dateKey) {
+  const date = new Date(toDateMs(dateKey))
+  if (!Number.isFinite(date.getTime())) return -1
+  const day = date.getDay()
+  return day === 0 ? 6 : day - 1
 }
 
 function getTrackingWeeks(logs = []) {
@@ -48,28 +83,54 @@ function getTrackingWeeks(logs = []) {
 
   if (sortedLogs.length === 0) return []
 
-  const firstDateMs = toDateMs(sortedLogs[0].date)
-  const weeks = []
+  const weeksByStart = new Map()
 
   for (const log of sortedLogs) {
-    const dayOffset = Math.floor((toDateMs(log.date) - firstDateMs) / 86400000)
-    const weekIndex = Math.max(0, Math.floor(dayOffset / 7))
+    const weekStart = getMondayWeekStartKey(log.date)
+    const dayIndex = getWeekdayIndex(log.date)
+    if (!weekStart || dayIndex < 0) continue
 
-    if (!weeks[weekIndex]) {
-      weeks[weekIndex] = { weights: [], calories: [] }
+    if (!weeksByStart.has(weekStart)) {
+      weeksByStart.set(weekStart, {
+        weekStart,
+        weightsByDay: Array(7).fill(null),
+        caloriesByDay: Array(7).fill(null)
+      })
     }
 
-    if (Number.isFinite(log.weight) && log.weight > 0) weeks[weekIndex].weights.push(log.weight)
-    if (Number.isFinite(log.calories) && log.calories > 0) weeks[weekIndex].calories.push(log.calories)
+    const week = weeksByStart.get(weekStart)
+    if (Number.isFinite(log.weight) && log.weight > 0) week.weightsByDay[dayIndex] = log.weight
+    if (Number.isFinite(log.calories) && log.calories > 0) week.caloriesByDay[dayIndex] = log.calories
   }
 
-  return weeks.filter(Boolean)
+  return [...weeksByStart.values()].sort((a, b) => a.weekStart.localeCompare(b.weekStart))
 }
 
 function calculateAverage(values = []) {
   if (!Array.isArray(values) || values.length === 0) return null
   const sum = values.reduce((total, value) => total + value, 0)
   return sum / values.length
+}
+
+function forwardFillWeekValues(valuesByDay = [], fallback = null) {
+  if (!Array.isArray(valuesByDay) || !valuesByDay.some(value => Number.isFinite(Number(value)))) {
+    return []
+  }
+
+  const filled = []
+  let previous = Number.isFinite(Number(fallback)) ? Number(fallback) : null
+
+  for (const value of valuesByDay) {
+    const numeric = Number(value)
+    if (Number.isFinite(numeric) && numeric > 0) {
+      previous = numeric
+    }
+    if (Number.isFinite(previous)) {
+      filled.push(previous)
+    }
+  }
+
+  return filled.length === 7 ? filled : []
 }
 
 export function estimateInitialTDEE(weightKg) {
@@ -91,47 +152,59 @@ export function getCompleteLogs(logs = []) {
     .sort((a, b) => toDateMs(a.date) - toDateMs(b.date))
 }
 
-export function calculateLoggedMaintenanceCalories(logs = [], startWeightKg = null) {
+export function calculateLoggedMaintenanceCalories(logs = [], startWeightKg = null, options = {}) {
   const startWeight = toNumberOrNull(startWeightKg)
   const effectiveStartWeight = Number.isFinite(startWeight) && startWeight > 0 ? startWeight : DEFAULT_START_WEIGHT_KG
   const weeklyLogs = getTrackingWeeks(logs)
+  const smoothingWindowWeeks = sanitizeTdeeSmoothingWindowWeeks(options?.smoothingWindowWeeks)
 
   if (weeklyLogs.length === 0) {
     return estimateInitialTDEE(effectiveStartWeight)
   }
 
   const baseMaintenanceCalories = roundToStep(effectiveStartWeight * MAINTENANCE_KCAL_PER_KG_BODY_WEIGHT, 5)
-  const weekWeightAverage = weeklyLogs.map((week) => calculateAverage(week.weights))
-  const weekCalorieAverage = weeklyLogs.map((week) => calculateAverage(week.calories))
-  const weekWeightEntries = weeklyLogs.map((week) => week.weights.length)
-  const weekCalorieEntries = weeklyLogs.map((week) => week.calories.length)
-
   const weekMaintenanceRaw = []
   const weekMaintenanceRounded = []
+  const weekWeightAverage = []
+  const weekCalorieAverage = []
+  let previousWeightAverage = effectiveStartWeight
+  let previousCalorieAverage = baseMaintenanceCalories
 
-  if (weekWeightEntries[0] > 0 && weekCalorieEntries[0] > 0) {
-    const firstWeekDeltaFromStart = weekWeightAverage[0] - effectiveStartWeight
-    const firstWeekMaintenance = weekCalorieAverage[0] + ((-firstWeekDeltaFromStart * KCAL_PER_KG_WEIGHT_CHANGE) / weekCalorieEntries[0])
-    weekMaintenanceRaw[0] = firstWeekMaintenance
-    weekMaintenanceRounded[0] = roundToStep(firstWeekMaintenance, 5)
-  } else {
-    weekMaintenanceRaw[0] = baseMaintenanceCalories
-    weekMaintenanceRounded[0] = baseMaintenanceCalories
-  }
+  for (let weekIndex = 0; weekIndex < weeklyLogs.length; weekIndex += 1) {
+    const week = weeklyLogs[weekIndex]
+    const filledWeights = forwardFillWeekValues(week.weightsByDay, previousWeightAverage)
+    const filledCalories = forwardFillWeekValues(week.caloriesByDay, previousCalorieAverage)
+    const weightAverage = calculateAverage(filledWeights)
+    const calorieAverage = calculateAverage(filledCalories)
+    weekWeightAverage[weekIndex] = weightAverage
+    weekCalorieAverage[weekIndex] = calorieAverage
 
-  for (let weekIndex = 1; weekIndex < weeklyLogs.length; weekIndex += 1) {
-    const hasFullCurrentWeek = weekWeightEntries[weekIndex] >= 7 && weekCalorieEntries[weekIndex] >= 7
-
-    if (!hasFullCurrentWeek || !Number.isFinite(weekWeightAverage[weekIndex - 1])) {
-      weekMaintenanceRaw[weekIndex] = weekMaintenanceRaw[weekIndex - 1]
-      weekMaintenanceRounded[weekIndex] = weekMaintenanceRounded[weekIndex - 1]
+    if (weekIndex === 0) {
+      if (Number.isFinite(weightAverage) && Number.isFinite(calorieAverage)) {
+        const firstWeekDeltaFromStart = weightAverage - effectiveStartWeight
+        weekMaintenanceRaw[weekIndex] = calorieAverage + ((-firstWeekDeltaFromStart * KCAL_PER_KG_WEIGHT_CHANGE) / filledCalories.length)
+      } else {
+        weekMaintenanceRaw[weekIndex] = baseMaintenanceCalories
+      }
+      weekMaintenanceRounded[weekIndex] = roundToStep(weekMaintenanceRaw[weekIndex], 5)
+      if (Number.isFinite(weightAverage)) previousWeightAverage = weightAverage
+      if (Number.isFinite(calorieAverage)) previousCalorieAverage = calorieAverage
       continue
     }
 
-    const weeklyWeightDelta = weekWeightAverage[weekIndex] - weekWeightAverage[weekIndex - 1]
-    const observedWeekMaintenance = weekCalorieAverage[weekIndex] + ((-weeklyWeightDelta * KCAL_PER_KG_WEIGHT_CHANGE) / weekCalorieEntries[weekIndex])
+    const hasFullCurrentWeek = filledWeights.length >= 7 && filledCalories.length >= 7
+    if (!hasFullCurrentWeek || !Number.isFinite(weightAverage) || !Number.isFinite(weekWeightAverage[weekIndex - 1])) {
+      weekMaintenanceRaw[weekIndex] = weekMaintenanceRaw[weekIndex - 1]
+      weekMaintenanceRounded[weekIndex] = weekMaintenanceRounded[weekIndex - 1]
+      if (Number.isFinite(weightAverage)) previousWeightAverage = weightAverage
+      if (Number.isFinite(calorieAverage)) previousCalorieAverage = calorieAverage
+      continue
+    }
 
-    const weeksInBlend = Math.min(weekIndex + 1, TDEE_SMOOTHING_WINDOW_WEEKS)
+    const weeklyWeightDelta = weightAverage - weekWeightAverage[weekIndex - 1]
+    const observedWeekMaintenance = calorieAverage + ((-weeklyWeightDelta * KCAL_PER_KG_WEIGHT_CHANGE) / filledCalories.length)
+
+    const weeksInBlend = Math.min(weekIndex + 1, smoothingWindowWeeks)
     const blendStartIndex = Math.max(0, weekIndex - (weeksInBlend - 1))
     const previousRoundedMaintenanceSum = weekMaintenanceRounded
       .slice(blendStartIndex, weekIndex)
@@ -140,6 +213,8 @@ export function calculateLoggedMaintenanceCalories(logs = [], startWeightKg = nu
     const blendedMaintenance = (observedWeekMaintenance + previousRoundedMaintenanceSum) / weeksInBlend
     weekMaintenanceRaw[weekIndex] = blendedMaintenance
     weekMaintenanceRounded[weekIndex] = roundToStep(blendedMaintenance, 5)
+    previousWeightAverage = weightAverage
+    previousCalorieAverage = calorieAverage
   }
 
   const latestMaintenance = weekMaintenanceRaw[weekMaintenanceRaw.length - 1]
@@ -210,12 +285,13 @@ export function computeCalorieTarget(maintenanceCalories, weeklyRateKg, context 
   return Math.max(MIN_RECOMMENDED_CALORIES, target)
 }
 
-export function calculateAdaptiveTDEE(logs = [], baselineTDEE = null, startWeightKg = null) {
+export function calculateAdaptiveTDEE(logs = [], baselineTDEE = null, startWeightKg = null, options = {}) {
   const baseline = Number.isFinite(Number(baselineTDEE))
     ? roundToStep(Number(baselineTDEE), 25)
     : estimateInitialTDEE(DEFAULT_START_WEIGHT_KG)
+  const smoothingWindowWeeks = sanitizeTdeeSmoothingWindowWeeks(options?.smoothingWindowWeeks)
 
-  const maintenanceCalories = calculateLoggedMaintenanceCalories(logs, startWeightKg)
+  const maintenanceCalories = calculateLoggedMaintenanceCalories(logs, startWeightKg, { smoothingWindowWeeks })
   const completeLogCount = getCompleteLogs(logs).length
 
   return {
@@ -236,6 +312,8 @@ export function calculateAdaptiveTDEE(logs = [], baselineTDEE = null, startWeigh
     detectedNewEpoch: false,
     epochCount: completeLogCount > 0 ? 1 : 0,
     completeLogCount,
-    optionsUsed: {}
+    optionsUsed: {
+      smoothingWindowWeeks
+    }
   }
 }

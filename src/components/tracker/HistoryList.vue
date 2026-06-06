@@ -23,7 +23,7 @@
         <div class="text-right">
           <div>{{ formatBodyWeight(log.weight) }}</div>
           <div class="text-caption">
-            {{ log.calories }} kcal
+            {{ formatCalories(log.calories) }}
           </div>
         </div>
       </q-item-section>
@@ -92,6 +92,13 @@ const canLoadMore = computed(() => props.logs.length > historyLimit.value)
 
 function loadMore() {
   historyLimit.value += 7
+}
+
+function formatCalories(value) {
+  const numeric = Number(value)
+  return Number.isFinite(numeric) && value !== null && value !== '' && value !== undefined
+    ? `${numeric} kcal`
+    : '—'
 }
 </script>
 

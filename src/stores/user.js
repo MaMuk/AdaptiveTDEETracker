@@ -115,6 +115,10 @@ export const useUserStore = defineStore('user', () => {
         get: () => appSettingsStore.appSettings.tdeeManualBias,
         set: (v) => { appSettingsStore.setTdeeManualBias(v) }
     })
+    const tdeeSmoothingWindowWeeks = computed({
+        get: () => appSettingsStore.appSettings.tdeeSmoothingWindowWeeks,
+        set: (v) => { appSettingsStore.setTdeeSmoothingWindowWeeks(v) }
+    })
     const startupActivityEnabled = computed({
         get: () => appSettingsStore.appSettings.startupActivityEnabled,
         set: (v) => { appSettingsStore.setStartupActivityEnabled(v) }
@@ -197,6 +201,7 @@ export const useUserStore = defineStore('user', () => {
         appSettings,
         suggestionsVisibleColumns,
         tdeeManualBias,
+        tdeeSmoothingWindowWeeks,
         startupActivityEnabled,
         startupActivityLevel,
         setupCompleted,
@@ -223,6 +228,7 @@ export const useUserStore = defineStore('user', () => {
         setAppSettings: appSettingsStore.setAppSettings,
         setSuggestionsVisibleColumns: appSettingsStore.setSuggestionsVisibleColumns,
         setTdeeManualBias: appSettingsStore.setTdeeManualBias,
+        setTdeeSmoothingWindowWeeks: appSettingsStore.setTdeeSmoothingWindowWeeks,
         setStartupActivityEnabled: appSettingsStore.setStartupActivityEnabled,
         setStartupActivityLevel: appSettingsStore.setStartupActivityLevel,
         setSetupCompleted: appSettingsStore.setSetupCompleted,

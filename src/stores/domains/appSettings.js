@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, watch } from 'vue'
 import { resolveSetupCompleted } from '../../utils/setupCompletion'
 import { readJsonStorage } from '../../utils/storage'
+import { sanitizeTdeeSmoothingWindowWeeks } from '../../utils/tdee'
 import { getPresetUnits, getPrimaryPresetUnits, resolveUnitId } from '../../utils/unitLibrary'
 
 const STORAGE_KEY = 'tdee_app_settings_store'
@@ -74,6 +75,7 @@ function sanitizeAppSettings(value) {
         tdeeManualBias: Number.isFinite(tdeeManualBias)
             ? Math.max(0, Math.min(1, Math.round(tdeeManualBias * 100) / 100))
             : 0,
+        tdeeSmoothingWindowWeeks: sanitizeTdeeSmoothingWindowWeeks(source.tdeeSmoothingWindowWeeks),
         startupActivityEnabled,
         startupActivityLevel,
         setupCompleted,
@@ -109,6 +111,13 @@ export const useAppSettingsStore = defineStore('appSettings', () => {
         appSettings.value = {
             ...appSettings.value,
             tdeeManualBias: sanitized
+        }
+    }
+
+    function setTdeeSmoothingWindowWeeks(value) {
+        appSettings.value = {
+            ...appSettings.value,
+            tdeeSmoothingWindowWeeks: sanitizeTdeeSmoothingWindowWeeks(value)
         }
     }
 
@@ -212,6 +221,7 @@ export const useAppSettingsStore = defineStore('appSettings', () => {
         setAppSettings,
         setSuggestionsVisibleColumns,
         setTdeeManualBias,
+        setTdeeSmoothingWindowWeeks,
         setStartupActivityEnabled,
         setStartupActivityLevel,
         setSetupCompleted,

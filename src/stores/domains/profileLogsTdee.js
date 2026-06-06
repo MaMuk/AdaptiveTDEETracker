@@ -12,6 +12,18 @@ import { useAppSettingsStore } from './appSettings'
 
 const STORAGE_KEY = 'tdee_profile_logs_tdee_store'
 
+function sanitizeLogCalories(value) {
+    if (value === null || value === undefined || value === '') return null
+    const numeric = Number(value)
+    return Number.isFinite(numeric) && numeric >= 0 ? numeric : null
+}
+
+function sanitizeLogWeight(value) {
+    if (value === null || value === undefined || value === '') return null
+    const numeric = Number(value)
+    return Number.isFinite(numeric) && numeric > 0 ? numeric : null
+}
+
 export const useProfileLogsTdeeStore = defineStore('profileLogsTdee', () => {
     const appSettingsStore = useAppSettingsStore()
     const startWeight = ref(null)
@@ -112,7 +124,9 @@ export const useProfileLogsTdeeStore = defineStore('profileLogsTdee', () => {
 
     function updateTDEE(snapshotDate = null) {
         ensureBaselineTDEE()
-        const maintenanceFromLogs = calculateLoggedMaintenanceCalories(logs.value, startWeight.value)
+        const smoothingWindowWeeks = appSettingsStore.appSettings?.tdeeSmoothingWindowWeeks
+        const tdeeOptions = { smoothingWindowWeeks }
+        const maintenanceFromLogs = calculateLoggedMaintenanceCalories(logs.value, startWeight.value, tdeeOptions)
         const startupActivityEnabled = Boolean(appSettingsStore.appSettings?.startupActivityEnabled)
         const manualBias = Number(appSettingsStore.appSettings?.tdeeManualBias) || 0
         const startupActivityLevel = appSettingsStore.appSettings?.startupActivityLevel || 'low'
@@ -133,7 +147,7 @@ export const useProfileLogsTdeeStore = defineStore('profileLogsTdee', () => {
                 manualBias
             })
             : maintenanceFromLogs
-        const result = calculateAdaptiveTDEE(logs.value, baselineTDEE.value, startWeight.value)
+        const result = calculateAdaptiveTDEE(logs.value, baselineTDEE.value, startWeight.value, tdeeOptions)
         tdeeDetails.value = {
             ...result,
             anchorBaselineTDEE: Math.round(Number(baselineTDEE.value)),
@@ -142,6 +156,7 @@ export const useProfileLogsTdeeStore = defineStore('profileLogsTdee', () => {
             activityBasedMaintenance,
             startupActivityEnabled,
             startupActivityLevel,
+            smoothingWindowWeeks: result.optionsUsed?.smoothingWindowWeeks,
             manualBias,
             appliedManualBias: startupActivityEnabled ? manualBias : 0,
             effectiveTrust: startupActivityEnabled ? manualBias : 0
@@ -153,11 +168,16 @@ export const useProfileLogsTdeeStore = defineStore('profileLogsTdee', () => {
     }
 
     function addLog(date, weight, calories) {
+        const sanitizedLog = {
+            date,
+            weight: sanitizeLogWeight(weight),
+            calories: sanitizeLogCalories(calories)
+        }
         const index = logs.value.findIndex(l => l.date === date)
         if (index !== -1) {
-            logs.value[index] = { date, weight, calories }
+            logs.value[index] = sanitizedLog
         } else {
-            logs.value.push({ date, weight, calories })
+            logs.value.push(sanitizedLog)
             logs.value.sort((a, b) => new Date(a.date) - new Date(b.date))
         }
         updateTDEE(date)
@@ -221,6 +241,9 @@ export const useProfileLogsTdeeStore = defineStore('profileLogsTdee', () => {
     }, { deep: true, immediate: true })
 
     watch(() => appSettingsStore.appSettings?.tdeeManualBias, () => {
+        updateTDEE()
+    })
+    watch(() => appSettingsStore.appSettings?.tdeeSmoothingWindowWeeks, () => {
         updateTDEE()
     })
     watch(() => appSettingsStore.appSettings?.startupActivityEnabled, () => {

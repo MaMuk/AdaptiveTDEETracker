@@ -42,6 +42,12 @@ function rowToCsv(row) {
   return row.map(csvCell).join(',')
 }
 
+function toOptionalNumber(value) {
+  if (value === null || value === undefined || value === '') return ''
+  const numeric = Number(value)
+  return Number.isFinite(numeric) ? numeric : ''
+}
+
 function readLogs(payload) {
   const logs = payload?.sections?.logs?.logs
   if (!Array.isArray(logs)) {
@@ -79,8 +85,8 @@ function buildWeeklyRows(logs) {
     }
     const day = weekdayKey(entry.date)
     const bucket = byWeek.get(weekStart)
-    bucket.weight[day] = Number.isFinite(Number(entry.weight)) ? Number(entry.weight) : ''
-    bucket.calories[day] = Number.isFinite(Number(entry.calories)) ? Number(entry.calories) : ''
+    bucket.weight[day] = toOptionalNumber(entry.weight)
+    bucket.calories[day] = toOptionalNumber(entry.calories)
   }
 
   const weeks = [...byWeek.keys()].sort((a, b) => a.localeCompare(b))

@@ -60,15 +60,33 @@
       @update:model-value="emit('update:tdeeManualBias', Number($event))"
     />
   </template>
+  <q-separator class="q-my-md" />
+  <div class="text-caption q-mb-sm">
+    Log-based TDEE averaging window
+  </div>
+  <q-input
+    :model-value="tdeeSmoothingWindowWeeks"
+    type="number"
+    label="Weeks"
+    filled
+    suffix="weeks"
+    :min="MIN_TDEE_SMOOTHING_WINDOW_WEEKS"
+    :max="MAX_TDEE_SMOOTHING_WINDOW_WEEKS"
+    :step="1"
+    @update:model-value="emit('update:tdeeSmoothingWindowWeeks', toNumberOrNull($event))"
+  />
 </template>
 
 <script setup>
+import { MAX_TDEE_SMOOTHING_WINDOW_WEEKS, MIN_TDEE_SMOOTHING_WINDOW_WEEKS, TDEE_SMOOTHING_WINDOW_WEEKS } from '../../utils/tdee'
+
 defineProps({
   enabled: { type: Boolean, default: false },
   activityLevel: { type: String, default: 'low' },
   age: { type: Number, default: null },
   sex: { type: String, default: 'male' },
   tdeeManualBias: { type: Number, default: 0 },
+  tdeeSmoothingWindowWeeks: { type: Number, default: TDEE_SMOOTHING_WINDOW_WEEKS },
   activityLevelOptions: { type: Array, required: true },
   sexOptions: { type: Array, required: true },
   showEnableToggle: { type: Boolean, default: true },
@@ -82,7 +100,8 @@ const emit = defineEmits([
   'update:activityLevel',
   'update:age',
   'update:sex',
-  'update:tdeeManualBias'
+  'update:tdeeManualBias',
+  'update:tdeeSmoothingWindowWeeks'
 ])
 
 function toNumberOrNull(value) {
