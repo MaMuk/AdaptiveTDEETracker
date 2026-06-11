@@ -483,7 +483,7 @@ import CalorieBudgetBar from '../components/CalorieBudgetBar.vue'
 import EntryDialog from '../components/EntryDialog.vue'
 import { addDays, todayKey } from '../utils/dateKey'
 import { computeCalorieTarget } from '../utils/tdee'
-import { convertAmountBetweenUnits, getUnitById, resolveUnitId } from '../utils/unitLibrary'
+import { hasTrackedMacroValueForEntry, macroTotalFromEntry, toNullableMacro } from '../utils/diaryMacros'
 
 const store = useUserStore()
 const route = useRoute()
@@ -907,55 +907,6 @@ function formatMacroWithUnit(value) {
 function formatMacroDistributionLine(item) {
   if (!item || Number(item.tracked) <= 0) return 'Not set'
   return `${item.grams}g (${item.percent}%)`
-}
-
-function parseEntryAmount(item) {
-  const raw = String(item?.amount || '').trim().replace(',', '.')
-  const match = raw.match(/^(\d+(?:\.\d+)?)\s*(.+)$/)
-  if (!match) return { amount: null, unit: null }
-  return { amount: Number(match[1]), unit: resolveUnitId(match[2]) || null }
-}
-
-function hasTrackedMacroValue(value) {
-  if (value === null || value === undefined || value === '') return false
-  const numeric = Number(value)
-  return Number.isFinite(numeric) && numeric >= 0
-}
-
-function isLegacyUntrackedMacroTriplet(entry) {
-  const protein = toNullableMacro(entry?.protein)
-  const carbohydrates = toNullableMacro(entry?.carbohydrates)
-  const fat = toNullableMacro(entry?.fat)
-  return protein === 0 && carbohydrates === 0 && fat === 0
-}
-
-function hasTrackedMacroValueForEntry(entry, key) {
-  if (isLegacyUntrackedMacroTriplet(entry)) return false
-  return hasTrackedMacroValue(entry?.[key])
-}
-
-function macroTotalFromEntry(item, key) {
-  if (!hasTrackedMacroValueForEntry(item, key)) return null
-  const numeric = Number(item?.[key])
-  if (!item || item.densityMode !== 'per100') return numeric
-
-  const parsed = parseEntryAmount(item)
-  if (!Number.isFinite(parsed.amount) || parsed.amount <= 0 || !parsed.unit) return numeric
-  const category = getUnitById(parsed.unit)?.category || 'mass'
-  if (category === 'portion') return Math.round((parsed.amount * numeric) * 10) / 10
-  if (parsed.unit !== 'g' && parsed.unit !== 'ml') return Math.round((parsed.amount * numeric) * 10) / 10
-
-  const canonicalAmount = category === 'volume'
-    ? convertAmountBetweenUnits(parsed.amount, parsed.unit, 'ml')
-    : convertAmountBetweenUnits(parsed.amount, parsed.unit, 'g')
-  if (!Number.isFinite(canonicalAmount)) return numeric
-  return Math.round(((canonicalAmount * numeric) / 100) * 10) / 10
-}
-
-function toNullableMacro(value) {
-  if (value === null || value === undefined || value === '') return null
-  const numeric = Number(value)
-  return Number.isFinite(numeric) && numeric >= 0 ? numeric : null
 }
 
 function confirmDeleteRow(row) {
