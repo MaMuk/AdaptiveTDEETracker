@@ -74,6 +74,7 @@
           >
             <DiaryFields
               :enabled="localFoodDiaryEnabled"
+              :macro-tracking-enabled="localDiaryMacroTrackingEnabled"
               :sections-text="localDiarySectionsText"
               :section-percentage-fields="sectionPercentageFields"
               :section-percentages="localSectionPercentages"
@@ -86,6 +87,7 @@
               @update:section-percentage="onSectionPercentageUpdate"
               @update:measurement-system="applyMeasurementPreset"
               @update:measurement-units="localMeasurementUnits = $event"
+              @update:macro-tracking-enabled="localDiaryMacroTrackingEnabled = $event"
             />
             <ExperimentalAiFields
               class="q-mt-md"
@@ -204,6 +206,7 @@ const localTdeeManualBias = ref(1)
 const enableStartupAssist = ref(true)
 
 const localFoodDiaryEnabled = ref(true)
+const localDiaryMacroTrackingEnabled = ref(false)
 const localDiarySectionsText = ref('Breakfast, Lunch, Dinner, Snacks')
 const localSectionPercentages = ref({})
 const localAiMealRecognitionEnabled = ref(false)
@@ -252,6 +255,7 @@ onMounted(() => {
     : (Number.isFinite(Number(store.tdeeManualBias)) ? Number(store.tdeeManualBias) : 1)
   enableStartupAssist.value = isFreshSetup ? true : Boolean(store.startupActivityEnabled)
   localFoodDiaryEnabled.value = isFreshSetup ? true : Boolean(store.foodDiaryEnabled)
+  localDiaryMacroTrackingEnabled.value = isFreshSetup ? false : Boolean(store.diaryMacroTrackingEnabled)
   localDiarySectionsText.value = (store.diarySections || []).join(', ')
   localSectionPercentages.value = { ...(store.diarySectionPercentages || {}) }
   localAiMealRecognitionEnabled.value = isFreshSetup ? false : Boolean(store.aiMealRecognitionEnabled)
@@ -385,6 +389,7 @@ function finishSetup() {
   store.setTdeeManualBias(enableStartupAssist.value ? localTdeeManualBias.value : 0)
 
   store.setFoodDiaryEnabled(localFoodDiaryEnabled.value)
+  store.setDiaryMacroTrackingEnabled(localFoodDiaryEnabled.value ? localDiaryMacroTrackingEnabled.value : false)
   store.setDiarySections(localDiarySectionsText.value.split(','))
   for (const field of sectionPercentageFields.value) {
     store.setDiarySectionPercentage(field.key, Number(localSectionPercentages.value[field.key]) || 0)

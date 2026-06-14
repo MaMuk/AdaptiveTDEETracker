@@ -209,6 +209,92 @@ The app will be available at `http://localhost:5173`
 npm run build
 ```
 
+The static website output is written to `dist/`.
+
+#### Build for a Subdirectory
+
+For a subdomain or domain root, the default build is correct:
+
+```bash
+npm run build
+```
+
+For a subdirectory, set the public base path with a leading and trailing slash:
+
+```bash
+VITE_BASE_PATH=/tdee/ npm run build
+```
+
+Deploy the generated `dist/` directory at that same path.
+
+### PWA Website Deployment
+
+The web build includes:
+
+- `public/manifest.webmanifest` for Android/iOS install metadata
+- install icons in `public/icons/`
+- `public/sw.js` service worker for app-shell and static asset caching
+- iOS home screen metadata in `index.html`
+
+Requirements:
+
+- Serve over HTTPS. Browsers generally require HTTPS for service workers and installable PWAs.
+- Keep the service worker at the deployed app root. For `/tdee/`, it must be available as `/tdee/sw.js`.
+- Use an HTML fallback for Vue Router history routes.
+- AI meal recognition remains an online feature because external API requests are not cached.
+
+Example nginx config for a subdomain or domain root:
+
+```nginx
+server {
+    listen 443 ssl http2;
+    server_name tdee.example.com;
+    root /var/www/tdee/dist;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    location = /sw.js {
+        add_header Cache-Control "no-cache";
+        try_files $uri =404;
+    }
+
+    location = /manifest.webmanifest {
+        default_type application/manifest+json;
+        try_files $uri =404;
+    }
+}
+```
+
+Example nginx config for a subdirectory at `/tdee/` with `dist/` copied to `/var/www/site/tdee/`:
+
+```nginx
+server {
+    listen 443 ssl http2;
+    server_name example.com;
+    root /var/www/site;
+    index index.html;
+
+    location /tdee/ {
+        try_files $uri $uri/ /tdee/index.html;
+    }
+
+    location = /tdee/sw.js {
+        add_header Cache-Control "no-cache";
+        try_files $uri =404;
+    }
+
+    location = /tdee/manifest.webmanifest {
+        default_type application/manifest+json;
+        try_files $uri =404;
+    }
+}
+```
+
+On Android, open the HTTPS site in Chrome and use the install prompt or **Add to Home screen**. On iOS/iPadOS, open it in Safari and use **Share -> Add to Home Screen**.
+
 #### Run Tests
 
 ```bash

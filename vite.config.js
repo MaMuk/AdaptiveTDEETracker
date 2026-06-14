@@ -3,7 +3,10 @@ import vue from '@vitejs/plugin-vue'
 import { quasar, transformAssetUrls } from '@quasar/vite-plugin'
 import { fileURLToPath } from 'node:url'
 
+const basePath = process.env.VITE_BASE_PATH || '/'
+
 export default defineConfig({
+  base: basePath,
   plugins: [
     vue({
       template: { transformAssetUrls }
