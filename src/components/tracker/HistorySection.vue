@@ -9,6 +9,7 @@
       </div>
       <q-btn-toggle
         v-model="mode"
+        data-tour="history-view-toggle"
         no-caps
         unelevated
         rounded
@@ -30,7 +31,7 @@
       <HistoryList
         v-if="mode === 'list'"
         key="list"
-        :logs="logs"
+        :logs="visibleLogs"
         :format-date="formatDate"
         :format-body-weight="formatBodyWeight"
         :tour-mock-entry="tourMockEntry"
@@ -41,7 +42,7 @@
       <HistoryGrid
         v-else
         key="grid"
-        :logs="logs"
+        :logs="visibleLogs"
         :selected-date="selectedDate"
         :format-date="formatDate"
         :format-body-weight="formatBodyWeight"
@@ -88,6 +89,11 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['select-date', 'delete-date', 'update:modelValue'])
+
+const visibleLogs = computed(() => {
+  if (props.logs.length === 0 && props.isTourMockMode && props.tourMockEntry) return [props.tourMockEntry]
+  return props.logs
+})
 
 const mode = computed({
   get: () => (props.modelValue === 'grid' ? 'grid' : 'list'),

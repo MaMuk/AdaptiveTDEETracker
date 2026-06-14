@@ -1,5 +1,8 @@
 <template>
-  <q-page padding>
+  <q-page
+    padding
+    data-tour="settings-page"
+  >
     <q-card
       data-tour="settings-profile"
       class="q-mb-md"

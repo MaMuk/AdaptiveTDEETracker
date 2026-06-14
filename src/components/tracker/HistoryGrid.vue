@@ -2,6 +2,7 @@
   <q-card
     flat
     bordered
+    data-tour="history-grid"
     class="history-grid-card bg-white rounded-borders"
   >
     <q-card-section class="q-pa-none">

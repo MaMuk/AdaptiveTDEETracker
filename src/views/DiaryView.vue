@@ -226,6 +226,7 @@
             <div class="row no-wrap">
               <q-btn
                 class="btn-muted-blue"
+                :data-tour="idx === 0 ? 'diary-create-meal' : null"
                 unelevated
                 dense
                 icon="restaurant"
@@ -987,7 +988,11 @@ function formatDate(dateString) {
 function openRecognitionFromDialog(section) {
   router.push({
     path: '/diary/ai-recognition',
-    query: { date: selectedDate.value, section: section || '' }
+    query: {
+      date: selectedDate.value,
+      section: section || '',
+      ...(route.query.tourMock === '1' ? { tourMock: '1' } : {})
+    }
   })
 }
 

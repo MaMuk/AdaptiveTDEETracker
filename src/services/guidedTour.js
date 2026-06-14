@@ -20,8 +20,28 @@ async function waitForElement(selector, timeoutMs = 3000) {
   return false
 }
 
+function clickElement(selector) {
+  const element = document.querySelector(selector)
+  if (!element || typeof element.click !== 'function') return false
+  element.click()
+  return true
+}
+
+function clickButtonIn(selector, index = 0) {
+  const button = document.querySelectorAll(`${selector} button`)[index]
+  if (!button || typeof button.click !== 'function') return false
+  button.click()
+  return true
+}
+
+function clickFirstButtonIn(selector) {
+  return clickButtonIn(selector, 0)
+}
+
 export async function startGuidedProductTour({ router, store, onFinish }) {
   stopActiveTour()
+  const initialHistoryViewMode = store.historyViewMode === 'grid' ? 'grid' : 'list'
+  store.historyViewMode = 'list'
   await router.push({ path: '/', query: { tourMock: '1' } })
   await nextTick()
   await waitForElement('[data-tour="tracking-fields-card"]')
@@ -62,9 +82,16 @@ export async function startGuidedProductTour({ router, store, onFinish }) {
     stopActiveTour()
     await router.push('/settings')
     await nextTick()
-    await waitForElement('[data-tour="settings-profile"]')
+    await waitForElement('[data-tour="settings-page"]')
 
     createPartTour([
+      {
+        element: '[data-tour="settings-page"]',
+        popover: {
+          title: 'Settings',
+          description: 'You are now in Settings, where profile, goal, diary, AI, and app-level options are configured.'
+        }
+      },
       {
         element: '[data-tour="settings-profile"]',
         popover: {
@@ -112,11 +139,182 @@ export async function startGuidedProductTour({ router, store, onFinish }) {
 
   const openDiaryTour = async () => {
     stopActiveTour()
-    await router.push('/diary')
+    await router.push({ path: '/diary', query: { tourMock: '1' } })
     await nextTick()
     await waitForElement('[data-tour="diary-overall"]')
 
     let diaryTour = null
+    let entryTour = null
+    let aiTour = null
+
+    const openSettingsFromEntryDialog = async () => {
+      clickElement('[data-tour="entry-dialog-cancel"]')
+      await nextTick()
+      entryTour?.destroy()
+      await openSettingsTour()
+    }
+    const openAiRecognitionPart = async () => {
+      entryTour?.destroy()
+      const openedFromDialog = clickElement('[data-tour="entry-dialog-ai"]')
+      if (!openedFromDialog) {
+        await router.push({ path: '/diary/ai-recognition', query: { tourMock: '1' } })
+      }
+      await nextTick()
+      await waitForElement('[data-tour="diary-ai-flow"]')
+      aiTour = createPartTour([
+        {
+          element: '[data-tour="diary-ai-flow"]',
+          popover: {
+            title: 'AI Recognition',
+            description: 'Use this screen to select meal photos, add optional context, and review recognized meal details.'
+          }
+        },
+        {
+          element: '[data-tour="diary-ai-image-actions"]',
+          popover: {
+            title: 'Photo and Context',
+            description: 'Choose a camera or gallery image. Label mode helps with packaged-food labels, and context can clarify portion size or ingredients.'
+          }
+        },
+        {
+          element: '[data-tour="diary-ai-review"]',
+          popover: {
+            title: 'Review Results',
+            description: 'Pick the closest guess, then adjust the name, calories, and other draft values before saving.'
+          }
+        },
+        {
+          element: '[data-tour="diary-ai-section"]',
+          popover: {
+            title: 'Diary Section',
+            description: 'Choose which diary section the reviewed result should be saved into.'
+          }
+        },
+        ...(store.diaryMacroTrackingEnabled
+          ? [{
+              element: '[data-tour="diary-ai-macros"]',
+              popover: {
+                title: 'Macro Scaling',
+                description: 'When macro tracking is enabled, changing calories scales the AI protein, carbohydrate, and fat draft values by the same ratio.'
+              }
+            }]
+          : []),
+        {
+          element: '[data-tour="diary-ai-save"]',
+          popover: {
+            title: 'Save Recognized Meal',
+            description: 'Saving adds the reviewed result to the diary.',
+            onNextClick: async () => {
+              aiTour.destroy()
+              await openSettingsTour()
+            }
+          }
+        }
+      ], openSettingsTour)
+    }
+    const returnToCaloriesModeStep = async () => {
+      clickButtonIn('[data-tour="entry-dialog-log-mode"]', 1)
+      await nextTick()
+      await waitForElement('[data-tour="entry-dialog-calories"]')
+      entryTour.movePrevious()
+    }
+    const openEntryDialogPart = async () => {
+      diaryTour?.destroy()
+      if (!document.querySelector('[data-tour="entry-dialog"]')) {
+        clickElement('[data-tour="diary-add-entry"]')
+        await nextTick()
+        await waitForElement('[data-tour="entry-dialog"]')
+      }
+
+      entryTour = createPartTour(entryDialogSteps, async () => {
+        clickElement('[data-tour="entry-dialog-cancel"]')
+        await nextTick()
+        if (store.aiMealRecognitionEnabled) {
+          await openAiRecognitionPart()
+        } else {
+          await openSettingsTour()
+        }
+      })
+    }
+    const entryDialogSteps = [
+      {
+        element: '[data-tour="entry-dialog"]',
+        popover: {
+          title: 'Entry Dialog',
+          description: 'This dialog is where you enter one diary item manually and review the calories before saving.'
+        }
+      },
+      {
+        element: '[data-tour="entry-dialog-name"]',
+        popover: {
+          title: 'Food Name',
+          description: 'Name the item here. Existing suggestions can appear as you type.'
+        }
+      },
+      {
+        element: '[data-tour="entry-dialog-log-mode"]',
+        popover: {
+          title: 'Entry Method',
+          description: 'Choose measured input when you know amount and energy density, or calories when you already know the total.'
+        }
+      },
+      {
+        element: '[data-tour="entry-dialog-calories"]',
+        popover: {
+          title: 'Calories Mode',
+          description: 'In calories mode, enter the total kcal for the item directly.',
+          onNextClick: async () => {
+            clickFirstButtonIn('[data-tour="entry-dialog-log-mode"]')
+            await nextTick()
+            await waitForElement('[data-tour="entry-dialog-energy-density"]')
+            entryTour.moveNext()
+          }
+        }
+      },
+      {
+        element: '[data-tour="entry-dialog-energy-density"]',
+        popover: {
+          title: 'Measured Mode',
+          description: 'In measured mode, enter the amount, unit, and kcal density, such as kcal/100g, kcal/100ml, or kcal per serving.',
+          onPrevClick: returnToCaloriesModeStep
+        }
+      },
+      ...(store.diaryMacroTrackingEnabled
+        ? [{
+            element: '[data-tour="entry-dialog-protein"]',
+            popover: {
+              title: 'Macros',
+              description: 'Enter protein, carbohydrates, and fat. In calories mode these are total grams; in measured mode they use the selected unit density.'
+            }
+          }]
+        : []),
+      {
+        element: '[data-tour="entry-dialog-summary"]',
+        popover: {
+          title: 'Nutrition Summary',
+          description: 'The dialog recalculates calories and macros here before the entry is saved.'
+        }
+      },
+      {
+        element: '[data-tour="entry-dialog-save"]',
+        popover: {
+          title: 'Save Entry',
+          description: 'Saving writes the dialog values into the diary.',
+          ...(!store.aiMealRecognitionEnabled ? { onNextClick: openSettingsFromEntryDialog } : {})
+        }
+      },
+      ...(store.aiMealRecognitionEnabled
+        ? [{
+            element: '[data-tour="entry-dialog-ai"]',
+            popover: {
+              title: 'Recognize Meal',
+              description: 'When experimental AI is enabled, this opens meal recognition from the dialog.',
+              onNextClick: openAiRecognitionPart
+            }
+          }]
+        : [])
+    ]
+
     diaryTour = createPartTour([
       {
         element: '[data-tour="footer-diary"]',
@@ -140,24 +338,21 @@ export async function startGuidedProductTour({ router, store, onFinish }) {
         }
       },
       {
-        element: '[data-tour="diary-add-entry"]',
+        element: '[data-tour="diary-create-meal"]',
         popover: {
-          title: 'Add Entries',
-          description: 'Add entries manually or from history to build your day quickly.'
+          title: 'Create Meal',
+          description: 'Create Meal combines every entry in this section into one meal entry and replaces the original section rows after you save.'
         }
       },
       {
-        element: '[data-tour="diary-actions"]',
+        element: '[data-tour="diary-add-entry"]',
         popover: {
-          title: 'Diary Actions',
-          description: 'Use these actions to go back or start meal recognition when AI is enabled.',
-          onNextClick: async () => {
-            diaryTour.destroy()
-            await openSettingsTour()
-          }
+          title: 'Add Entries',
+          description: 'Use Add Entry for a single food item. It opens the entry dialog for manual input or suggestion-based entry.',
+          onNextClick: openEntryDialogPart
         }
       }
-    ], openSettingsTour)
+    ], openEntryDialogPart)
   }
 
   const startNavigationPart = async () => {
@@ -297,7 +492,7 @@ export async function startGuidedProductTour({ router, store, onFinish }) {
       element: '[data-tour="history-section"]',
       popover: {
         title: 'History',
-        description: 'Shows saved daily entries so you can revisit prior days quickly.'
+        description: 'Shows saved daily logs and lets you choose whether to review them as a list or compact grid.'
       }
     },
     {
@@ -311,8 +506,30 @@ export async function startGuidedProductTour({ router, store, onFinish }) {
       element: '[data-tour="history-delete-first"]',
       popover: {
         title: 'Delete Entry Action',
-        description: 'Use this icon to delete a saved entry.',
+        description: 'Use this icon to delete a saved entry.'
+      }
+    },
+    {
+      element: '[data-tour="history-view-toggle"]',
+      popover: {
+        title: 'History View Mode',
+        description: 'Switch between List for row actions and Grid for a spreadsheet-style weekly overview.',
         onNextClick: async () => {
+          store.historyViewMode = 'grid'
+          await nextTick()
+          await waitForElement('[data-tour="history-grid"]')
+          trackerTour.moveNext()
+        }
+      }
+    },
+    {
+      element: '[data-tour="history-grid"]',
+      popover: {
+        title: 'Grid View',
+        description: 'Each week is grouped into weight and calorie rows. Tap a day cell to jump the tracker to that date.',
+        onNextClick: async () => {
+          store.historyViewMode = initialHistoryViewMode
+          await nextTick()
           trackerTour.destroy()
           await startOverviewPart()
         }

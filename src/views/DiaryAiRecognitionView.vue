@@ -3,7 +3,7 @@
     padding
     class="diary-ai-page"
   >
-    <q-card>
+    <q-card data-tour="diary-ai-flow">
       <q-card-section class="row items-center justify-between q-py-sm">
         <div class="text-h6">
           AI Meal Recognition (Experimental)
@@ -50,11 +50,15 @@
 
         <q-checkbox
           v-model="isNutritionLabel"
+          data-tour="diary-ai-label-mode"
           label="Nutrition label mode (for packaged products / labels)"
           class="q-mb-sm"
         />
 
-        <div class="row q-gutter-sm">
+        <div
+          class="row q-gutter-sm"
+          data-tour="diary-ai-image-actions"
+        >
           <q-btn
             outline
             icon="photo_camera"
@@ -149,6 +153,7 @@
 
         <q-input
           v-model="additionalContext"
+          data-tour="diary-ai-context"
           class="q-mt-md"
           filled
           type="textarea"
@@ -157,7 +162,10 @@
           hint="Example: chicken wrap with garlic sauce, homemade, large portion."
         />
 
-        <div class="row q-gutter-sm q-mt-md">
+        <div
+          class="row q-gutter-sm q-mt-md"
+          data-tour="diary-ai-analyze-actions"
+        >
           <q-btn
             color="primary"
             label="Analyze Meal"
@@ -177,6 +185,7 @@
 
     <q-card
       v-if="guesses.length > 0"
+      data-tour="diary-ai-review"
       class="q-mt-md"
     >
       <q-card-section>
@@ -190,6 +199,7 @@
         <q-list
           bordered
           separator
+          data-tour="diary-ai-guesses"
         >
           <q-item
             v-for="(guess, idx) in guesses"
@@ -224,6 +234,7 @@
         </div>
         <q-slider
           v-model="draftCalories"
+          data-tour="diary-ai-calorie-slider"
           :min="sliderMin"
           :max="sliderMax"
           :step="sliderStep"
@@ -236,6 +247,7 @@
 
         <q-input
           v-model.number="draftCalories"
+          data-tour="diary-ai-calorie-manual"
           type="number"
           min="0"
           step="1"
@@ -247,6 +259,7 @@
 
         <q-select
           v-model="draftSection"
+          data-tour="diary-ai-section"
           :options="sectionOptions"
           filled
           emit-value
@@ -257,6 +270,7 @@
 
         <div
           v-if="store.diaryMacroTrackingEnabled"
+          data-tour="diary-ai-macros"
           class="row q-col-gutter-sm q-mb-sm"
         >
           <div class="col-12 col-sm-4">
@@ -293,6 +307,7 @@
 
         <q-btn
           color="positive"
+          data-tour="diary-ai-save"
           label="Save to Diary"
           @click="saveToDiary"
         />
@@ -427,6 +442,11 @@ onMounted(() => {
 
   if (initialSection && store.diarySections.includes(initialSection)) {
     draftSection.value = initialSection
+  }
+
+  if (route.query.tourMock === '1') {
+    loadTourMockGuesses()
+    return
   }
 
   if (!store.openAiApiKey) {
@@ -585,6 +605,19 @@ function selectGuess(index) {
   } else {
     warningMessage.value = ''
   }
+}
+
+function loadTourMockGuesses() {
+  guesses.value = [{
+    name: 'Chicken rice bowl',
+    calories: { low: 520, estimate: 650, high: 780 },
+    confidence: 'medium',
+    protein: 38,
+    carbohydrates: 72,
+    fat: 18
+  }]
+  demoMessage.value = ''
+  selectGuess(0)
 }
 
 function saveToDiary() {

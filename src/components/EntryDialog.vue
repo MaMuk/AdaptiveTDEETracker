@@ -5,7 +5,10 @@
     position="top"
     persistent
   >
-    <q-card class="entry-dialog-card">
+    <q-card
+      class="entry-dialog-card"
+      data-tour="entry-dialog"
+    >
       <q-card-section class="row items-center justify-between q-pb-sm">
         <div class="text-h6">
           {{ resolvedTitle }}
@@ -26,6 +29,7 @@
             <div class="name-field-wrap">
               <q-input
                 v-model="draft.name"
+                data-tour="entry-dialog-name"
                 dense
                 filled
                 label="Name"
@@ -72,7 +76,10 @@
             />
           </div>
 
-          <div class="col-12">
+          <div
+            class="col-12"
+            data-tour="entry-dialog-log-mode"
+          >
             <div class="text-caption text-grey-7 q-mb-xs">
               Log by
             </div>
@@ -88,7 +95,10 @@
           </div>
 
           <template v-if="logMode === 'measured'">
-            <div class="col-7 col-sm-6">
+            <div
+              class="col-7 col-sm-6"
+              data-tour="entry-dialog-measured-amount"
+            >
               <q-input
                 v-model="measuredAmount"
                 dense
@@ -99,7 +109,10 @@
               />
             </div>
 
-            <div class="col-5 col-sm-6">
+            <div
+              class="col-5 col-sm-6"
+              data-tour="entry-dialog-measured-unit"
+            >
               <q-select
                 v-model="measuredUnit"
                 dense
@@ -111,7 +124,10 @@
               />
             </div>
 
-            <div class="col-12">
+            <div
+              class="col-12"
+              data-tour="entry-dialog-energy-density"
+            >
               <q-input
                 v-model.number="measuredEnergy"
                 dense
@@ -131,6 +147,7 @@
           <div
             v-if="logMode === 'calories'"
             class="col-12"
+            data-tour="entry-dialog-calories"
           >
             <q-input
               v-model.number="caloriesDirect"
@@ -158,7 +175,10 @@
           </div>
 
           <template v-if="showMacroFields">
-            <div class="col-12 col-sm-4">
+            <div
+              class="col-12 col-sm-4"
+              data-tour="entry-dialog-protein"
+            >
               <q-input
                 v-model.number="proteinInput"
                 dense
@@ -170,7 +190,10 @@
                 :suffix="macroInputSuffix"
               />
             </div>
-            <div class="col-12 col-sm-4">
+            <div
+              class="col-12 col-sm-4"
+              data-tour="entry-dialog-carbohydrates"
+            >
               <q-input
                 v-model.number="carbohydratesInput"
                 dense
@@ -182,7 +205,10 @@
                 :suffix="macroInputSuffix"
               />
             </div>
-            <div class="col-12 col-sm-4">
+            <div
+              class="col-12 col-sm-4"
+              data-tour="entry-dialog-fat"
+            >
               <q-input
                 v-model.number="fatInput"
                 dense
@@ -211,7 +237,10 @@
           </div>
 
           <div class="col-12">
-            <div class="nutrition-summary">
+            <div
+              class="nutrition-summary"
+              data-tour="entry-dialog-summary"
+            >
               <div class="nutrition-title">
                 Nutrition Summary
               </div>
@@ -251,6 +280,7 @@
               <q-btn
                 v-if="aiRecognitionEnabled"
                 class="ai-magic-btn"
+                data-tour="entry-dialog-ai"
                 dense
                 unelevated
                 icon="auto_awesome"
@@ -271,12 +301,14 @@
         />
         <q-btn
           flat
+          data-tour="entry-dialog-cancel"
           label="Cancel"
           @click="close"
         />
         <q-btn
           color="primary"
           unelevated
+          data-tour="entry-dialog-save"
           :label="saveLabel"
           @click="save"
         />
