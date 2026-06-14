@@ -218,6 +218,12 @@ export async function startGuidedProductTour({ router, store, onFinish }) {
       await waitForElement('[data-tour="entry-dialog-calories"]')
       entryTour.movePrevious()
     }
+    const goToMeasuredModeStep = async () => {
+      clickFirstButtonIn('[data-tour="entry-dialog-log-mode"]')
+      await nextTick()
+      await waitForElement('[data-tour="entry-dialog-energy-density"]')
+      entryTour.moveNext()
+    }
     const openEntryDialogPart = async () => {
       diaryTour?.destroy()
       if (!document.querySelector('[data-tour="entry-dialog"]')) {
@@ -263,14 +269,19 @@ export async function startGuidedProductTour({ router, store, onFinish }) {
         popover: {
           title: 'Calories Mode',
           description: 'In calories mode, enter the total kcal for the item directly.',
-          onNextClick: async () => {
-            clickFirstButtonIn('[data-tour="entry-dialog-log-mode"]')
-            await nextTick()
-            await waitForElement('[data-tour="entry-dialog-energy-density"]')
-            entryTour.moveNext()
-          }
+          ...(!store.diaryMacroTrackingEnabled ? { onNextClick: goToMeasuredModeStep } : {})
         }
       },
+      ...(store.diaryMacroTrackingEnabled
+        ? [{
+            element: '[data-tour="entry-dialog-macro-calorie-bind"]',
+            popover: {
+              title: 'Bind Macros',
+              description: 'Use this checkbox when you want calorie changes to scale protein, carbohydrates, and fat by the same ratio.',
+              onNextClick: goToMeasuredModeStep
+            }
+          }]
+        : []),
       {
         element: '[data-tour="entry-dialog-energy-density"]',
         popover: {

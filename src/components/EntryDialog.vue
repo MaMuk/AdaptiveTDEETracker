@@ -162,6 +162,18 @@
           </div>
 
           <div
+            v-if="logMode === 'calories' && showMacroFields"
+            class="col-12"
+            data-tour="entry-dialog-macro-calorie-bind"
+          >
+            <q-checkbox
+              v-model="bindMacrosToCalories"
+              dense
+              label="Bind macros to calories"
+            />
+          </div>
+
+          <div
             v-if="showMetadataFields"
             class="col-12"
           >
@@ -358,6 +370,9 @@ const caloriesDirect = ref(null)
 const proteinInput = ref(null)
 const carbohydratesInput = ref(null)
 const fatInput = ref(null)
+const bindMacrosToCalories = ref(false)
+const macroBindBaseline = ref(null)
+let isApplyingMacroScale = false
 
 const open = computed({
   get: () => props.modelValue,
@@ -440,6 +455,33 @@ watch(() => props.modelValue, (isOpen) => {
   if (!isOpen) return
   initializeDraft(props.entry, props.defaultSection)
 })
+
+watch(logMode, (mode) => {
+  if (mode !== 'calories') {
+    bindMacrosToCalories.value = false
+    macroBindBaseline.value = null
+  } else if (bindMacrosToCalories.value) {
+    macroBindBaseline.value = createMacroBindBaseline()
+  }
+})
+
+watch(bindMacrosToCalories, (enabled) => {
+  macroBindBaseline.value = enabled ? createMacroBindBaseline() : null
+})
+
+watch(caloriesDirect, (nextCalories) => {
+  if (!props.showMacroFields || logMode.value !== 'calories' || !bindMacrosToCalories.value) return
+  const next = normalizeBindableCalories(nextCalories)
+  if (next === null) return
+  const baseline = macroBindBaseline.value
+  if (!baseline || !Number.isFinite(baseline.calories) || baseline.calories <= 0) return
+  scaleMacrosFromBaseline(baseline, next / baseline.calories)
+})
+
+watch([proteinInput, carbohydratesInput, fatInput], () => {
+  if (isApplyingMacroScale || !props.showMacroFields || logMode.value !== 'calories' || !bindMacrosToCalories.value) return
+  macroBindBaseline.value = createMacroBindBaseline()
+}, { flush: 'sync' })
 
 function defaultDraft() {
   return {
@@ -548,6 +590,8 @@ function initializeDraft(entry, defaultSection) {
   draft.value = source
   initialDraft.value = { ...source }
   logMode.value = resolveMode(source)
+  bindMacrosToCalories.value = false
+  macroBindBaseline.value = null
 
   const parsedMeasured = parseMeasuredAmount(source)
   measuredAmount.value = parsedMeasured.amount
@@ -578,6 +622,40 @@ function initializeDraft(entry, defaultSection) {
     ? deriveMacroInputFromEntry(source, 'fat')
     : (Number.isFinite(Number(source.fat)) ? Number(source.fat) : null)
   showNameSuggestions.value = false
+}
+
+function normalizeBindableCalories(value) {
+  if (value === null || value === undefined || value === '') return null
+  const numeric = Number(value)
+  return Number.isFinite(numeric) && numeric >= 0 ? numeric : null
+}
+
+function createMacroBindBaseline() {
+  return {
+    calories: normalizeBindableCalories(caloriesDirect.value),
+    protein: proteinInput.value,
+    carbohydrates: carbohydratesInput.value,
+    fat: fatInput.value
+  }
+}
+
+function scaleMacrosFromBaseline(baseline, ratio) {
+  if (!Number.isFinite(ratio) || ratio < 0) return
+  isApplyingMacroScale = true
+  try {
+    proteinInput.value = scaleMacroInput(baseline.protein, ratio)
+    carbohydratesInput.value = scaleMacroInput(baseline.carbohydrates, ratio)
+    fatInput.value = scaleMacroInput(baseline.fat, ratio)
+  } finally {
+    isApplyingMacroScale = false
+  }
+}
+
+function scaleMacroInput(value, ratio) {
+  if (value === null || value === undefined || value === '') return value
+  const numeric = Number(value)
+  if (!Number.isFinite(numeric) || numeric < 0) return value
+  return Math.round(numeric * ratio * 10) / 10
 }
 
 function sanitizeMeasuredInput(value) {
