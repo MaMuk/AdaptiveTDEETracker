@@ -292,7 +292,7 @@ const weightChartData = computed(() => {
       fill: false,
       pointRadius: 3,
       pointHoverRadius: 6,
-      spanGaps: false
+      spanGaps: true
     }
   ]
 
