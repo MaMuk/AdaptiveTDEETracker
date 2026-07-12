@@ -27,6 +27,27 @@
       </q-card-section>
     </q-card>
 
+    <!-- Shared Chart Range -->
+    <q-card class="q-mb-md">
+      <q-card-section class="chart-range-card">
+        <div class="chart-range-label">
+          range
+        </div>
+        <div class="chart-range-links">
+          <button
+            v-for="preset in chartRangePresets"
+            :key="preset.value"
+            type="button"
+            class="chart-range-link"
+            :class="{ 'chart-range-link--active': chartRangePreset === preset.value }"
+            @click="chartRangePreset = preset.value"
+          >
+            {{ preset.label }}
+          </button>
+        </div>
+      </q-card-section>
+    </q-card>
+
     <!-- Weight Tracking Chart -->
     <q-card class="q-mb-md">
       <q-card-section>
@@ -63,6 +84,45 @@
         </div>
       </q-card-section>
     </q-card>
+
+    <!-- Diary Macro Composition Chart -->
+    <q-card
+      v-if="showMacroCompositionChart"
+      class="q-mb-md"
+    >
+      <q-card-section>
+        <div class="row items-center justify-between q-mb-md">
+          <div class="text-h6">
+            Tracked Macro Composition
+          </div>
+          <q-btn-toggle
+            v-model="macroCompositionMode"
+            toggle-color="dark"
+            toggle-text-color="white"
+            :options="[
+              {value: 'calories', icon: 'local_fire_department', color: 'deep-orange-5', toggleTextColor: 'deep-orange-5'},
+              {value: 'grams', icon: 'scale', color: 'blue-grey-5', toggleTextColor: 'blue-grey-5'}
+            ]"
+            dense
+          />
+        </div>
+        <div
+          v-if="hasMacroCompositionData"
+          style="position: relative; height: 320px;"
+        >
+          <Bar
+            :data="macroCompositionChartData"
+            :options="macroCompositionChartOptions"
+          />
+        </div>
+        <div
+          v-else
+          class="text-center text-grey-7 q-pa-lg"
+        >
+          {{ hasAnyMacroCompositionData ? 'No diary macro data available for this range' : 'No diary macro data available yet' }}
+        </div>
+      </q-card-section>
+    </q-card>
   </q-page>
 </template>
 
@@ -71,13 +131,15 @@ import { computed, ref } from 'vue'
 import { useUserStore } from '../stores/user'
 import { addDays, diffDays, formatDateKeyLocal, parseDateKey, todayKey } from '../utils/dateKey'
 import { convertWeeklyRateKg, kgToLb } from '../utils/bodyUnits'
-import { Line } from 'vue-chartjs'
+import { macroTotalFromEntry } from '../utils/diaryMacros'
+import { Bar, Line } from 'vue-chartjs'
 import {
   Chart as ChartJS,
   CategoryScale,
   LinearScale,
   PointElement,
   LineElement,
+  BarElement,
   Title,
   Tooltip,
   Legend,
@@ -85,12 +147,27 @@ import {
 } from 'chart.js'
 
 const chartZoom = ref('tracked')
+const macroCompositionMode = ref('calories')
+const chartRangePreset = ref('4w')
+const chartRangePresets = [
+  { value: '7d', label: '7d' },
+  { value: '4w', label: '4w' },
+  { value: '4m', label: '4m' },
+  { value: '1y', label: '1y' },
+  { value: 'all', label: 'all' }
+]
+const MACRO_CALORIES_PER_GRAM = {
+  protein: 4,
+  carbohydrates: 4,
+  fat: 9
+}
 
 ChartJS.register(
   CategoryScale,
   LinearScale,
   PointElement,
   LineElement,
+  BarElement,
   Title,
   Tooltip,
   Legend,
@@ -100,6 +177,7 @@ ChartJS.register(
 const store = useUserStore()
 const profileMeasurementSystem = computed(() => store.profileMeasurementSystem || 'metric')
 const bodyWeightUnitLabel = computed(() => profileMeasurementSystem.value === 'imperial' ? 'lb' : 'kg')
+const macroCompositionUnitLabel = computed(() => macroCompositionMode.value === 'grams' ? 'g' : 'kcal')
 
 const weeklyColumns = [
   { name: 'delta', label: 'Δ Week', field: 'delta', align: 'center', sortable: true, style: 'width: 25%' },
@@ -198,9 +276,153 @@ function getDeltaClass(delta) {
   return 'text-grey-7'
 }
 
+function getChartRangeStartDate(anchorDate, firstDate) {
+  if (chartRangePreset.value === 'all') return new Date(firstDate)
+
+  const startDate = new Date(anchorDate)
+  if (chartRangePreset.value === '7d') {
+    startDate.setDate(startDate.getDate() - 6)
+  } else if (chartRangePreset.value === '4w') {
+    startDate.setDate(startDate.getDate() - 27)
+  } else if (chartRangePreset.value === '4m') {
+    startDate.setMonth(startDate.getMonth() - 4)
+  } else if (chartRangePreset.value === '1y') {
+    startDate.setFullYear(startDate.getFullYear() - 1)
+  }
+
+  return startDate > firstDate ? startDate : new Date(firstDate)
+}
+
 const hasWeightData = computed(() => {
   return store.logs && store.logs.some(log => log.weight)
 })
+
+const showMacroCompositionChart = computed(() => Boolean(store.foodDiaryEnabled && store.diaryMacroTrackingEnabled))
+const macroCompositionRows = computed(() => {
+  if (!showMacroCompositionChart.value || !Array.isArray(store.foodDiaryEntries)) return []
+
+  const days = new Map()
+  for (const entry of store.foodDiaryEntries) {
+    const date = String(entry.date || '').trim()
+    if (!date) continue
+
+    const row = days.get(date) || {
+      date,
+      calories: 0,
+      proteinGrams: 0,
+      carbohydratesGrams: 0,
+      fatGrams: 0
+    }
+
+    const totalCalories = Number(entry.calories)
+    if (Number.isFinite(totalCalories) && totalCalories > 0) {
+      row.calories += totalCalories
+    }
+    row.proteinGrams += getEntryMacroGrams(entry, 'protein')
+    row.carbohydratesGrams += getEntryMacroGrams(entry, 'carbohydrates')
+    row.fatGrams += getEntryMacroGrams(entry, 'fat')
+    days.set(date, row)
+  }
+
+  return [...days.values()]
+    .filter(row => {
+      return row.calories > 0 || row.proteinGrams + row.carbohydratesGrams + row.fatGrams > 0
+    })
+    .sort((a, b) => a.date.localeCompare(b.date))
+})
+const rangedMacroCompositionRows = computed(() => {
+  if (macroCompositionRows.value.length === 0) return []
+
+  const firstDate = parseDateKey(macroCompositionRows.value[0].date)
+  const lastDate = parseDateKey(macroCompositionRows.value[macroCompositionRows.value.length - 1].date)
+  const startDateKey = formatDateKeyLocal(getChartRangeStartDate(lastDate, firstDate))
+  return macroCompositionRows.value.filter(row => row.date >= startDateKey)
+})
+const visibleMacroCompositionRows = computed(() => {
+  if (macroCompositionMode.value === 'grams') {
+    return rangedMacroCompositionRows.value
+      .filter(row => {
+        return row.proteinGrams + row.carbohydratesGrams + row.fatGrams > 0
+      })
+      .map(row => ({
+        ...row,
+        protein: row.proteinGrams,
+        carbohydrates: row.carbohydratesGrams,
+        fat: row.fatGrams
+      }))
+  }
+
+  return rangedMacroCompositionRows.value
+    .filter(row => row.calories > 0)
+    .map(normalizeMacroCalorieRow)
+})
+const hasMacroCompositionData = computed(() => visibleMacroCompositionRows.value.length > 0)
+const hasAnyMacroCompositionData = computed(() => macroCompositionRows.value.length > 0)
+const macroCompositionChartData = computed(() => ({
+  labels: visibleMacroCompositionRows.value.map(row => formatDateShort(parseDateKey(row.date))),
+  datasets: [
+    {
+      label: 'Protein',
+      data: visibleMacroCompositionRows.value.map(row => row.protein),
+      backgroundColor: '#e53935',
+      borderWidth: 0,
+      stack: 'macros'
+    },
+    {
+      label: 'Carbohydrates',
+      data: visibleMacroCompositionRows.value.map(row => row.carbohydrates),
+      backgroundColor: '#fbc02d',
+      borderWidth: 0,
+      stack: 'macros'
+    },
+    {
+      label: 'Fat',
+      data: visibleMacroCompositionRows.value.map(row => row.fat),
+      backgroundColor: '#43a047',
+      borderWidth: 0,
+      stack: 'macros'
+    },
+    ...(macroCompositionMode.value === 'calories' ? [{
+      label: 'Untracked calories',
+      data: visibleMacroCompositionRows.value.map(row => row.untracked),
+      backgroundColor: '#9e9e9e',
+      borderWidth: 0,
+      stack: 'macros'
+    }] : [])
+  ]
+}))
+
+function getEntryMacroGrams(entry, key) {
+  const grams = macroTotalFromEntry(entry, key)
+  if (!Number.isFinite(grams) || grams < 0) return 0
+  return grams
+}
+
+function normalizeMacroCalorieRow(row) {
+  const protein = row.proteinGrams * MACRO_CALORIES_PER_GRAM.protein
+  const carbohydrates = row.carbohydratesGrams * MACRO_CALORIES_PER_GRAM.carbohydrates
+  const fat = row.fatGrams * MACRO_CALORIES_PER_GRAM.fat
+  const macroCalories = protein + carbohydrates + fat
+  if (macroCalories > row.calories && macroCalories > 0) {
+    const scale = row.calories / macroCalories
+    return {
+      ...row,
+      protein: protein * scale,
+      carbohydrates: carbohydrates * scale,
+      fat: fat * scale,
+      untracked: 0
+    }
+  }
+
+  return {
+    ...row,
+    protein,
+    carbohydrates,
+    fat,
+    untracked: Math.max(0, row.calories - macroCalories)
+  }
+}
+
 const weightChartData = computed(() => {
   if (!store.logs || store.logs.length === 0) {
     return {
@@ -224,6 +446,7 @@ const weightChartData = computed(() => {
   const lastLogDateKey = sortedLogs[sortedLogs.length - 1].date
   const firstDate = parseDateKey(firstDateKey)
   const lastLogDate = parseDateKey(lastLogDateKey)
+  const rangeStartDate = getChartRangeStartDate(lastLogDate, firstDate)
   
   let goalDate = new Date(lastLogDate)
   if (store.averageWeight && store.goalWeight && store.weeklyRate !== undefined) {
@@ -250,7 +473,7 @@ const weightChartData = computed(() => {
   }
 
   const allDates = []
-  let currentDate = new Date(firstDate)
+  let currentDate = new Date(rangeStartDate)
   
   while (currentDate <= endDate) {
     allDates.push(new Date(currentDate))
@@ -405,6 +628,57 @@ const weightChartOptions = computed(() => ({
     intersect: false
   }
 }))
+
+const macroCompositionChartOptions = computed(() => ({
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: {
+      display: true,
+      position: 'top'
+    },
+    tooltip: {
+      mode: 'index',
+      intersect: false,
+      callbacks: {
+        label: function(context) {
+          const value = Number(context.parsed.y) || 0
+          return `${context.dataset.label}: ${Math.round(value)} ${macroCompositionUnitLabel.value}`
+        },
+        footer: function(items) {
+          const total = items.reduce((sum, item) => sum + (Number(item.parsed.y) || 0), 0)
+          return `Total: ${Math.round(total)} ${macroCompositionUnitLabel.value}`
+        }
+      }
+    }
+  },
+  scales: {
+    x: {
+      stacked: true,
+      title: {
+        display: true,
+        text: 'Date'
+      }
+    },
+    y: {
+      stacked: true,
+      beginAtZero: true,
+      title: {
+        display: true,
+        text: macroCompositionMode.value === 'grams' ? 'Macros (g)' : 'Calories (kcal)'
+      },
+      ticks: {
+        callback: function(value) {
+          return Math.round(value)
+        }
+      }
+    }
+  },
+  interaction: {
+    mode: 'index',
+    intersect: false
+  }
+}))
 </script>
 
 <style scoped>
@@ -421,6 +695,48 @@ const weightChartOptions = computed(() => ({
 .mobile-optimized-table :deep(td) {
   padding: 8px 4px;
   font-size: 0.875rem;
+}
+
+.chart-range-card {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  padding-bottom: 8px;
+  padding-top: 8px;
+}
+
+.chart-range-label {
+  color: #546e7a;
+  font-size: 0.875rem;
+}
+
+.chart-range-links {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  padding: 0;
+  flex-wrap: wrap;
+}
+
+.chart-range-link {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  color: #546e7a;
+  cursor: pointer;
+  font: inherit;
+  min-height: 40px;
+  min-width: 48px;
+  padding: 8px 12px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.chart-range-link--active {
+  color: #000;
+  font-weight: 600;
+  text-decoration-thickness: 2px;
 }
 
 /* Make table more compact on smaller screens */
