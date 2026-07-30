@@ -105,9 +105,19 @@
         />
         <div class="row items-center justify-between q-mb-sm">
           <div class="col q-pr-sm">
-            <div class="text-subtitle1">
-              {{ section.label }}
-            </div>
+            <button
+              type="button"
+              class="section-title-button"
+              :aria-expanded="String(!isSectionCollapsed(section.value))"
+              :aria-controls="`diary-section-${sectionDomKey(section.value)}`"
+              @click="toggleSectionCollapsed(section.value)"
+            >
+              <q-icon
+                :name="isSectionCollapsed(section.value) ? 'chevron_right' : 'expand_more'"
+                size="sm"
+              />
+              <span class="section-title-text">{{ section.label }}</span>
+            </button>
             <CalorieBudgetBar
               :consumed="sectionTrackedCalories(section.value)"
               :target="sectionTargetCalories(section.value)"
@@ -122,120 +132,128 @@
             :color="isSectionClosed(section.value) ? 'grey-7' : 'primary'"
             :icon="isSectionClosed(section.value) ? 'lock' : 'lock_open'"
             :label="isSectionClosed(section.value) ? 'Closed' : 'Close'"
-            @click="toggleSectionClosed(section.value)"
+            @click.stop="toggleSectionClosed(section.value)"
           />
         </div>
 
         <div
-          v-for="row in entriesBySection(section.value)"
-          :key="row.id"
-          class="entry-row q-mb-xs"
+          :id="`diary-section-${sectionDomKey(section.value)}`"
         >
-          <div class="row items-center no-wrap">
-            <div class="col entry-main q-pr-sm">
-              <div class="entry-name">
-                {{ row.name }}
-              </div>
-              <div class="text-caption text-grey-7">
-                {{ row.amount || 'No amount' }} · {{ row.calories }} kcal<span v-if="row.usePer100g"> · {{ row.caloriesPer100g || 0 }} kcal/100g</span>
-              </div>
+          <q-slide-transition>
+            <div v-show="!isSectionCollapsed(section.value)">
               <div
-                v-if="store.diaryMacroTrackingEnabled"
-                class="macro-inline-row"
+                v-for="row in entriesBySection(section.value)"
+                :key="row.id"
+                class="entry-row q-mb-xs"
               >
-                <q-badge
-                  class="macro-pill"
-                  outline
-                  color="red-6"
-                >
-                  P {{ formatMacroWithUnit(macroTotalFromEntry(row, 'protein')) }}
-                </q-badge>
-                <q-badge
-                  class="macro-pill"
-                  outline
-                  color="amber-7"
-                >
-                  C {{ formatMacroWithUnit(macroTotalFromEntry(row, 'carbohydrates')) }}
-                </q-badge>
-                <q-badge
-                  class="macro-pill"
-                  outline
-                  color="green-6"
-                >
-                  F {{ formatMacroWithUnit(macroTotalFromEntry(row, 'fat')) }}
-                </q-badge>
+                <div class="row items-center no-wrap">
+                  <div class="col entry-main q-pr-sm">
+                    <div class="entry-name">
+                      {{ row.name }}
+                    </div>
+                    <div class="text-caption text-grey-7">
+                      {{ row.amount || 'No amount' }} · {{ row.calories }} kcal<span v-if="row.usePer100g"> · {{ row.caloriesPer100g || 0 }} kcal/100g</span>
+                    </div>
+                    <div
+                      v-if="store.diaryMacroTrackingEnabled"
+                      class="macro-inline-row"
+                    >
+                      <q-badge
+                        class="macro-pill"
+                        outline
+                        color="red-6"
+                      >
+                        P {{ formatMacroWithUnit(macroTotalFromEntry(row, 'protein')) }}
+                      </q-badge>
+                      <q-badge
+                        class="macro-pill"
+                        outline
+                        color="amber-7"
+                      >
+                        C {{ formatMacroWithUnit(macroTotalFromEntry(row, 'carbohydrates')) }}
+                      </q-badge>
+                      <q-badge
+                        class="macro-pill"
+                        outline
+                        color="green-6"
+                      >
+                        F {{ formatMacroWithUnit(macroTotalFromEntry(row, 'fat')) }}
+                      </q-badge>
+                    </div>
+                  </div>
+                  <div class="row items-center q-gutter-xs no-wrap">
+                    <q-btn
+                      dense
+                      flat
+                      round
+                      icon="drag_indicator"
+                      color="grey-7"
+                    >
+                      <q-menu auto-close>
+                        <q-list
+                          dense
+                          style="min-width: 160px;"
+                        >
+                          <q-item
+                            v-for="targetSection in allSections"
+                            :key="`${row.id}_${targetSection.value || '__unsectioned__'}`"
+                            clickable
+                            :disable="isSectionClosed(targetSection.value)"
+                            @click="quickMoveRow(row, targetSection.value || '__unsectioned__')"
+                          >
+                            <q-item-section>{{ targetSection.label }}</q-item-section>
+                          </q-item>
+                        </q-list>
+                      </q-menu>
+                    </q-btn>
+                    <q-btn
+                      dense
+                      flat
+                      icon="edit"
+                      color="primary"
+                      @click="openEntryDialog({ section: row.section, row })"
+                    />
+                    <q-btn
+                      dense
+                      flat
+                      round
+                      icon="delete"
+                      color="negative"
+                      @click="confirmDeleteRow(row)"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div class="entry-row entry-action-row q-mt-xs">
+                <div class="row items-center justify-between no-wrap">
+                  <div class="row no-wrap">
+                    <q-btn
+                      :data-tour="idx === 0 ? 'diary-add-entry' : null"
+                      class="btn-muted-green"
+                      unelevated
+                      dense
+                      icon="add"
+                      label="Add Entry"
+                      :disable="isSectionClosed(section.value)"
+                      @click="openEntryDialog({ section: section.value })"
+                    />
+                  </div>
+                  <div class="row no-wrap">
+                    <q-btn
+                      class="btn-muted-blue"
+                      :data-tour="idx === 0 ? 'diary-create-meal' : null"
+                      unelevated
+                      dense
+                      icon="restaurant"
+                      label="Create Meal"
+                      :disable="isSectionClosed(section.value)"
+                      @click="openCreateMealDialog(section.value)"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
-            <div class="row items-center q-gutter-xs no-wrap">
-              <q-btn
-                dense
-                flat
-                round
-                icon="drag_indicator"
-                color="grey-7"
-              >
-                <q-menu auto-close>
-                  <q-list
-                    dense
-                    style="min-width: 160px;"
-                  >
-                    <q-item
-                      v-for="targetSection in allSections"
-                      :key="`${row.id}_${targetSection.value || '__unsectioned__'}`"
-                      clickable
-                      :disable="isSectionClosed(targetSection.value)"
-                      @click="quickMoveRow(row, targetSection.value || '__unsectioned__')"
-                    >
-                      <q-item-section>{{ targetSection.label }}</q-item-section>
-                    </q-item>
-                  </q-list>
-                </q-menu>
-              </q-btn>
-              <q-btn
-                dense
-                flat
-                icon="edit"
-                color="primary"
-                @click="openEntryDialog({ section: row.section, row })"
-              />
-              <q-btn
-                dense
-                flat
-                round
-                icon="delete"
-                color="negative"
-                @click="confirmDeleteRow(row)"
-              />
-            </div>
-          </div>
-        </div>
-        <div class="entry-row entry-action-row q-mt-xs">
-          <div class="row items-center justify-between no-wrap">
-            <div class="row no-wrap">
-              <q-btn
-                :data-tour="idx === 0 ? 'diary-add-entry' : null"
-                class="btn-muted-green"
-                unelevated
-                dense
-                icon="add"
-                label="Add Entry"
-                :disable="isSectionClosed(section.value)"
-                @click="openEntryDialog({ section: section.value })"
-              />
-            </div>
-            <div class="row no-wrap">
-              <q-btn
-                class="btn-muted-blue"
-                :data-tour="idx === 0 ? 'diary-create-meal' : null"
-                unelevated
-                dense
-                icon="restaurant"
-                label="Create Meal"
-                :disable="isSectionClosed(section.value)"
-                @click="openCreateMealDialog(section.value)"
-              />
-            </div>
-          </div>
+          </q-slide-transition>
         </div>
       </div>
     </q-card>
@@ -485,6 +503,7 @@ import EntryDialog from '../components/EntryDialog.vue'
 import { addDays, todayKey } from '../utils/dateKey'
 import { computeCalorieTarget } from '../utils/tdee'
 import { hasTrackedMacroValueForEntry, macroTotalFromEntry, toNullableMacro } from '../utils/diaryMacros'
+import { calculateDiarySectionTargets, diarySectionKey } from '../utils/diarySectionTargets'
 
 const store = useUserStore()
 const route = useRoute()
@@ -511,6 +530,8 @@ const entryDialogRef = ref(null)
 const activeEntryRow = ref(null)
 const entryDialogSection = ref('')
 const pendingSectionCombine = ref(null)
+const COLLAPSED_DIARY_SECTIONS_SESSION_KEY = 'tdee_diary_collapsed_sections'
+const collapsedDiarySectionsByDate = ref(readCollapsedDiarySectionsSession())
 
 const allSections = computed(() => ([
   { label: 'Unsectioned', value: '' },
@@ -690,13 +711,17 @@ watch(showEntryDialog, (isOpen) => {
   pendingSectionCombine.value = null
 })
 
+watch(collapsedDiarySectionsByDate, value => {
+  sessionStorage.setItem(COLLAPSED_DIARY_SECTIONS_SESSION_KEY, JSON.stringify(value))
+}, { deep: true })
+
 watch(selectedDate, date => {
   router.replace({ path: '/diary', query: { date } })
   ensureBudgetSnapshot(date)
 })
 
 function sectionKey(section) {
-  return section || '__unsectioned__'
+  return diarySectionKey(section)
 }
 
 function normalizeDateKey(value) {
@@ -720,48 +745,22 @@ function sectionPercentageForDate(section, date) {
 }
 
 const effectiveSectionTargets = computed(() => {
-  const baseTargets = {}
-  let transferable = 0
-  const openKeys = []
+  const sectionPercentages = {}
+  const closedSectionKeys = []
 
   for (const section of allSections.value) {
     const key = sectionKey(section.value)
-    const percentage = sectionPercentageForDate(section.value, selectedDate.value)
-    const baseTarget = Math.max(0, Math.round((totalDailyBudget.value * percentage) / 100))
-    baseTargets[key] = baseTarget
-
-    if (isSectionClosed(section.value)) {
-      const consumed = sectionTrackedCalories(section.value)
-      transferable += (baseTarget - consumed)
-    } else {
-      openKeys.push(key)
-    }
+    sectionPercentages[key] = sectionPercentageForDate(section.value, selectedDate.value)
+    if (isSectionClosed(section.value)) closedSectionKeys.push(key)
   }
 
-  const adjusted = { ...baseTargets }
-  const openBaseSum = openKeys.reduce((sum, key) => sum + (baseTargets[key] || 0), 0)
-
-  if (transferable !== 0 && openKeys.length > 0) {
-    let distributed = 0
-    for (let i = 0; i < openKeys.length; i += 1) {
-      const key = openKeys[i]
-      const isLast = i === openKeys.length - 1
-      const ratio = openBaseSum > 0 ? ((baseTargets[key] || 0) / openBaseSum) : (1 / openKeys.length)
-      const share = isLast
-        ? (transferable - distributed)
-        : Math.round(transferable * ratio)
-      adjusted[key] = Math.max(0, (adjusted[key] || 0) + share)
-      distributed += share
-    }
-  }
-
-  for (const section of allSections.value) {
-    if (!isSectionClosed(section.value)) continue
-    const key = sectionKey(section.value)
-    adjusted[key] = sectionTrackedCalories(section.value)
-  }
-
-  return adjusted
+  return calculateDiarySectionTargets({
+    sections: allSections.value,
+    totalDailyBudget: totalDailyBudget.value,
+    sectionPercentages,
+    sectionCalories: sectionCalories.value,
+    closedSectionKeys
+  })
 })
 
 function sectionTrackedCalories(section) {
@@ -787,6 +786,51 @@ function isSectionClosed(section) {
 function toggleSectionClosed(section) {
   const key = sectionKey(section)
   store.toggleDiarySectionClosedForDate(selectedDate.value, key)
+}
+
+function sanitizeCollapsedDiarySections(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {}
+  const out = {}
+  for (const [date, values] of Object.entries(raw)) {
+    const keyDate = String(date || '').trim()
+    if (!keyDate || !Array.isArray(values)) continue
+    const sections = [...new Set(values.map(value => sectionKey(value)))]
+    if (sections.length > 0) out[keyDate] = sections
+  }
+  return out
+}
+
+function readCollapsedDiarySectionsSession() {
+  try {
+    return sanitizeCollapsedDiarySections(JSON.parse(sessionStorage.getItem(COLLAPSED_DIARY_SECTIONS_SESSION_KEY) || '{}'))
+  } catch {
+    return {}
+  }
+}
+
+function collapsedSectionKeysForSelectedDate() {
+  const values = collapsedDiarySectionsByDate.value?.[selectedDate.value]
+  return Array.isArray(values) ? values : []
+}
+
+function isSectionCollapsed(section) {
+  return collapsedSectionKeysForSelectedDate().includes(sectionKey(section))
+}
+
+function toggleSectionCollapsed(section) {
+  const key = sectionKey(section)
+  const current = collapsedSectionKeysForSelectedDate()
+  const next = current.includes(key)
+    ? current.filter(item => item !== key)
+    : [...current, key]
+  const updated = { ...collapsedDiarySectionsByDate.value }
+  if (next.length > 0) updated[selectedDate.value] = next
+  else delete updated[selectedDate.value]
+  collapsedDiarySectionsByDate.value = updated
+}
+
+function sectionDomKey(section) {
+  return encodeURIComponent(sectionKey(section)).replace(/%/g, '_')
 }
 
 function ensureBudgetSnapshot(date) {
@@ -1002,6 +1046,30 @@ ensureBudgetSnapshot(selectedDate.value)
 <style scoped>
 .section-block {
   padding: 2px 0;
+}
+
+.section-title-button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 500;
+  gap: 2px;
+  line-height: 1.3;
+  margin: 0 0 2px -4px;
+  max-width: 100%;
+  padding: 0;
+  text-align: left;
+}
+
+.section-title-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .entry-row {
