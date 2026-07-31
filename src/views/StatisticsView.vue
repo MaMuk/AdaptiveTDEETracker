@@ -30,20 +30,39 @@
     <!-- Shared Chart Range -->
     <q-card class="q-mb-md">
       <q-card-section class="chart-range-card">
-        <div class="chart-range-label">
-          range
+        <div class="chart-range-row">
+          <div class="chart-range-label">
+            range
+          </div>
+          <div class="chart-range-links">
+            <button
+              v-for="preset in chartRangePresets"
+              :key="preset.value"
+              type="button"
+              class="chart-range-link"
+              :class="{ 'chart-range-link--active': chartRangePreset === preset.value }"
+              @click="chartRangePreset = preset.value"
+            >
+              {{ preset.label }}
+            </button>
+          </div>
         </div>
-        <div class="chart-range-links">
-          <button
-            v-for="preset in chartRangePresets"
-            :key="preset.value"
-            type="button"
-            class="chart-range-link"
-            :class="{ 'chart-range-link--active': chartRangePreset === preset.value }"
-            @click="chartRangePreset = preset.value"
-          >
-            {{ preset.label }}
-          </button>
+        <div class="chart-range-row">
+          <div class="chart-range-label">
+            group
+          </div>
+          <div class="chart-range-links">
+            <button
+              v-for="option in chartGroupingOptions"
+              :key="option.value"
+              type="button"
+              class="chart-range-link chart-range-link--wide"
+              :class="{ 'chart-range-link--active': chartGrouping === option.value }"
+              @click="chartGrouping = option.value"
+            >
+              {{ option.label }}
+            </button>
+          </div>
         </div>
       </q-card-section>
     </q-card>
@@ -149,12 +168,18 @@ import {
 const chartZoom = ref('tracked')
 const macroCompositionMode = ref('calories')
 const chartRangePreset = ref('4w')
+const chartGrouping = ref('daily')
 const chartRangePresets = [
   { value: '7d', label: '7d' },
   { value: '4w', label: '4w' },
   { value: '4m', label: '4m' },
   { value: '1y', label: '1y' },
   { value: 'all', label: 'all' }
+]
+const chartGroupingOptions = [
+  { value: 'daily', label: 'daily' },
+  { value: 'weekly', label: 'weekly' },
+  { value: 'monthly', label: 'monthly' }
 ]
 const MACRO_CALORIES_PER_GRAM = {
   protein: 4,
@@ -178,6 +203,11 @@ const store = useUserStore()
 const profileMeasurementSystem = computed(() => store.profileMeasurementSystem || 'metric')
 const bodyWeightUnitLabel = computed(() => profileMeasurementSystem.value === 'imperial' ? 'lb' : 'kg')
 const macroCompositionUnitLabel = computed(() => macroCompositionMode.value === 'grams' ? 'g' : 'kcal')
+const chartGroupingAxisLabel = computed(() => {
+  if (chartGrouping.value === 'weekly') return 'Week'
+  if (chartGrouping.value === 'monthly') return 'Month'
+  return 'Date'
+})
 
 const weeklyColumns = [
   { name: 'delta', label: 'Δ Week', field: 'delta', align: 'center', sortable: true, style: 'width: 25%' },
@@ -262,6 +292,12 @@ function formatDateShort(date) {
   return `${months[d.getMonth()]} ${d.getDate()}`
 }
 
+function formatMonthShort(date) {
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+  const d = date instanceof Date ? date : parseDateKey(date)
+  return `${months[d.getMonth()]} ${d.getFullYear()}`
+}
+
 function getDeltaClass(delta) {
   if (delta === '—' || !store.weeklyRate) return 'text-grey-7'
   
@@ -291,6 +327,63 @@ function getChartRangeStartDate(anchorDate, firstDate) {
   }
 
   return startDate > firstDate ? startDate : new Date(firstDate)
+}
+
+function getChartPeriodStart(date, grouping) {
+  const d = date instanceof Date ? new Date(date) : parseDateKey(date)
+  if (grouping === 'weekly') return getWeekStart(d)
+  if (grouping === 'monthly') {
+    d.setDate(1)
+    return d
+  }
+  return d
+}
+
+function formatChartLabel(date, grouping) {
+  if (grouping === 'monthly') return formatMonthShort(date)
+  if (grouping === 'weekly') return formatDateShort(date)
+  return `${date.getMonth() + 1}/${date.getDate()}`
+}
+
+function averageFinite(values) {
+  const finiteValues = values.filter(value => Number.isFinite(value))
+  if (finiteValues.length === 0) return null
+  return finiteValues.reduce((sum, value) => sum + value, 0) / finiteValues.length
+}
+
+function groupChartSeries(dates, seriesList) {
+  if (chartGrouping.value === 'daily') {
+    return {
+      labels: dates.map(date => formatChartLabel(date, chartGrouping.value)),
+      series: seriesList
+    }
+  }
+
+  const groups = []
+  const groupIndexes = new Map()
+  dates.forEach((date, index) => {
+    const periodStart = getChartPeriodStart(date, chartGrouping.value)
+    const periodKey = formatDateKeyLocal(periodStart)
+    let groupIndex = groupIndexes.get(periodKey)
+
+    if (groupIndex === undefined) {
+      groupIndex = groups.length
+      groupIndexes.set(periodKey, groupIndex)
+      groups.push({
+        periodStart,
+        indexes: []
+      })
+    }
+
+    groups[groupIndex].indexes.push(index)
+  })
+
+  return {
+    labels: groups.map(group => formatChartLabel(group.periodStart, chartGrouping.value)),
+    series: seriesList.map(series => {
+      return groups.map(group => averageFinite(group.indexes.map(index => series[index])))
+    })
+  }
 }
 
 const hasWeightData = computed(() => {
@@ -339,8 +432,10 @@ const rangedMacroCompositionRows = computed(() => {
   return macroCompositionRows.value.filter(row => row.date >= startDateKey)
 })
 const visibleMacroCompositionRows = computed(() => {
+  const groupedRows = groupMacroCompositionRows(rangedMacroCompositionRows.value)
+
   if (macroCompositionMode.value === 'grams') {
-    return rangedMacroCompositionRows.value
+    return groupedRows
       .filter(row => {
         return row.proteinGrams + row.carbohydratesGrams + row.fatGrams > 0
       })
@@ -352,14 +447,14 @@ const visibleMacroCompositionRows = computed(() => {
       }))
   }
 
-  return rangedMacroCompositionRows.value
+  return groupedRows
     .filter(row => row.calories > 0)
     .map(normalizeMacroCalorieRow)
 })
 const hasMacroCompositionData = computed(() => visibleMacroCompositionRows.value.length > 0)
 const hasAnyMacroCompositionData = computed(() => macroCompositionRows.value.length > 0)
 const macroCompositionChartData = computed(() => ({
-  labels: visibleMacroCompositionRows.value.map(row => formatDateShort(parseDateKey(row.date))),
+  labels: visibleMacroCompositionRows.value.map(row => row.label),
   datasets: [
     {
       label: 'Protein',
@@ -391,6 +486,37 @@ const macroCompositionChartData = computed(() => ({
     }] : [])
   ]
 }))
+
+function groupMacroCompositionRows(rows) {
+  if (chartGrouping.value === 'daily') {
+    return rows.map(row => ({
+      ...row,
+      label: formatDateShort(parseDateKey(row.date))
+    }))
+  }
+
+  const groups = new Map()
+  for (const row of rows) {
+    const periodStart = getChartPeriodStart(parseDateKey(row.date), chartGrouping.value)
+    const periodKey = formatDateKeyLocal(periodStart)
+    const group = groups.get(periodKey) || {
+      date: periodKey,
+      label: formatChartLabel(periodStart, chartGrouping.value),
+      calories: 0,
+      proteinGrams: 0,
+      carbohydratesGrams: 0,
+      fatGrams: 0
+    }
+
+    group.calories += row.calories
+    group.proteinGrams += row.proteinGrams
+    group.carbohydratesGrams += row.carbohydratesGrams
+    group.fatGrams += row.fatGrams
+    groups.set(periodKey, group)
+  }
+
+  return [...groups.values()].sort((a, b) => a.date.localeCompare(b.date))
+}
 
 function getEntryMacroGrams(entry, key) {
   const grams = macroTotalFromEntry(entry, key)
@@ -480,9 +606,6 @@ const weightChartData = computed(() => {
     currentDate.setDate(currentDate.getDate() + 1)
   }
 
-  const labels = allDates.map(date => {
-    return `${date.getMonth() + 1}/${date.getDate()}`
-  })
   const weights = allDates.map(date => {
     const dateKey = formatDateKeyLocal(date)
     const log = sortedLogs.find(l => {
@@ -504,11 +627,13 @@ const weightChartData = computed(() => {
   }
 
   const trendLine = calculateTrendLineExtended(sortedLogs, allDates, firstDate, trendEndDate, profileMeasurementSystem.value)
+  const groupedChartData = groupChartSeries(allDates, [weights, trendLine, goalLine])
+  const [groupedWeights, groupedTrendLine, groupedGoalLine] = groupedChartData.series
 
   const datasets = [
     {
       label: 'Weight',
-      data: weights,
+      data: groupedWeights,
       borderColor: '#4dd0e1', // .bg-cyan-4
       backgroundColor: '#2b7d88',
       tension: 0.1,
@@ -521,10 +646,10 @@ const weightChartData = computed(() => {
 
 
 
-  if (trendLine.length > 0) {
+  if (groupedTrendLine.some(value => value !== null)) {
     datasets.push({
       label: 'Trend Estimate',
-      data: trendLine,
+      data: groupedTrendLine,
       borderColor: '#ba68c8', //.bg-purple-4
       borderDash: [5, 5],
       tension: 0,
@@ -534,10 +659,10 @@ const weightChartData = computed(() => {
     })
   }
 
-  if (goalLine.length > 0) {
+  if (groupedGoalLine.some(value => value !== null)) {
     datasets.push({
       label: 'Set Goal',
-      data: goalLine,
+      data: groupedGoalLine,
       borderColor: '#ffd54f', //.bg-amber-4
       tension: 0,
       fill: false,
@@ -547,7 +672,7 @@ const weightChartData = computed(() => {
   }
 
   return {
-    labels,
+    labels: groupedChartData.labels,
     datasets
   }
 })
@@ -618,7 +743,7 @@ const weightChartOptions = computed(() => ({
     x: {
       title: {
         display: true,
-        text: 'Date'
+        text: chartGroupingAxisLabel.value
       }
     }
   },
@@ -657,7 +782,7 @@ const macroCompositionChartOptions = computed(() => ({
       stacked: true,
       title: {
         display: true,
-        text: 'Date'
+        text: chartGroupingAxisLabel.value
       }
     },
     y: {
@@ -698,17 +823,27 @@ const macroCompositionChartOptions = computed(() => ({
 }
 
 .chart-range-card {
-  align-items: center;
+  align-items: stretch;
   display: flex;
+  flex-direction: column;
   gap: 12px;
   justify-content: center;
   padding-bottom: 8px;
   padding-top: 8px;
 }
 
+.chart-range-row {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
 .chart-range-label {
   color: #546e7a;
   font-size: 0.875rem;
+  min-width: 42px;
+  text-align: right;
 }
 
 .chart-range-links {
@@ -731,6 +866,10 @@ const macroCompositionChartOptions = computed(() => ({
   padding: 8px 12px;
   text-decoration: underline;
   text-underline-offset: 3px;
+}
+
+.chart-range-link--wide {
+  min-width: 72px;
 }
 
 .chart-range-link--active {

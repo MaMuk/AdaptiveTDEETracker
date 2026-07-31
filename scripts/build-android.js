@@ -1,12 +1,13 @@
 import { spawnSync } from 'node:child_process'
-import { accessSync, constants, readFileSync, writeFileSync } from 'node:fs'
+import { accessSync, constants, copyFileSync, existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 
 const projectRoot = process.cwd()
 const androidDir = path.join(projectRoot, 'android')
 const gradlewPath = path.join(androidDir, 'gradlew')
 const packageJsonPath = path.join(projectRoot, 'package.json')
-const androidAppBuildGradlePath = path.join(androidDir, 'app', 'build.gradle')
+const releaseApkDir = path.join(androidDir, 'app', 'build', 'outputs', 'apk', 'release')
+const defaultReleaseApkPath = path.join(releaseApkDir, 'app-release.apk')
 
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
@@ -104,21 +105,20 @@ function getAppVersion() {
   }
 
   return {
-    appVersion,
-    versionCode: (major * 10000) + (minor * 100) + patch
+    appVersion
   }
 }
 
-function applyAndroidVersioning() {
-  const { appVersion, versionCode } = getAppVersion()
-  const buildGradle = readFileSync(androidAppBuildGradlePath, 'utf8')
-  const nextBuildGradle = buildGradle
-    .replace(/^\s*versionCode\s+.*$/m, `        versionCode ${versionCode}`)
-    .replace(/^\s*versionName\s+.*$/m, `        versionName "${appVersion}"`)
+function publishVersionedReleaseApk() {
+  const { appVersion } = getAppVersion()
+  const versionedReleaseApkPath = path.join(releaseApkDir, `adaptive_tdee_tracker-v${appVersion}.apk`)
 
-  if (nextBuildGradle !== buildGradle) {
-    writeFileSync(androidAppBuildGradlePath, nextBuildGradle, 'utf8')
+  if (!existsSync(defaultReleaseApkPath)) {
+    throw new Error(`Release APK not found at ${defaultReleaseApkPath}`)
   }
+
+  copyFileSync(defaultReleaseApkPath, versionedReleaseApkPath)
+  console.log(`Versioned release APK: ${versionedReleaseApkPath}`)
 }
 
 function main() {
@@ -128,8 +128,11 @@ function main() {
   verifyEnvironment()
   run('npm', ['run', 'build'])
   run('npx', ['cap', 'sync', 'android'])
-  applyAndroidVersioning()
   run('./gradlew', [gradleTask], { cwd: androidDir })
+
+  if (isReleaseBuild) {
+    publishVersionedReleaseApk()
+  }
 }
 
 main()
